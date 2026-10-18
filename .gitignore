@@ -1,0 +1,14 @@
+# ---- ESP-IDF generated ----
+build/
+.build/
+sdkconfig
+sdkconfig.old
+
+# ---- logs / temp ----
+*.log
+*.tmp
+
+# ---- editors ----
+.vscode/
+.idea/
+*.swp

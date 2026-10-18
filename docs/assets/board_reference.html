@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-S3 果云版底板 · 接口与模块整理</title>
+<style>
+  :root{
+    --bg:#f5f7fa;
+    --panel:#ffffff;
+    --ink:#1a2233;
+    --ink-soft:#5a6478;
+    --line:#e2e7ef;
+    --accent:#1f6feb;
+    --accent-soft:#eaf2ff;
+    --i2s:#7c3aed;
+    --i2c:#0d9488;
+    --uart:#ea580c;
+    --pwr:#dc2626;
+    --warn:#b45309;
+    --warn-bg:#fff7ed;
+    --mono:'Cascadia Code','Consolas','SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Segoe UI','Microsoft YaHei',system-ui,-apple-system,sans-serif;
+    line-height:1.65;font-size:15px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 72px;}
+
+  header.hero{
+    background:linear-gradient(135deg,#12233f 0%,#1f3f6e 55%,#1f6feb 100%);
+    color:#fff;border-radius:16px;padding:34px 36px;margin-bottom:28px;
+    box-shadow:0 12px 32px rgba(18,35,63,.22);
+  }
+  header.hero .tag{
+    display:inline-block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:3px 10px;border-radius:999px;margin-bottom:14px;
+  }
+  header.hero h1{margin:0 0 10px;font-size:29px;letter-spacing:.01em;}
+  header.hero p{margin:0;color:#cddcf3;font-size:15px;max-width:820px;}
+  header.hero .meta{
+    display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;
+  }
+  header.hero .meta span{
+    font-family:var(--mono);font-size:12.5px;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.2);padding:4px 10px;border-radius:8px;
+  }
+
+  h2{
+    font-size:19px;margin:38px 0 14px;padding-left:12px;
+    border-left:4px solid var(--accent);letter-spacing:.01em;
+  }
+  h2 .en{font-size:12px;color:var(--ink-soft);font-weight:400;margin-left:8px;letter-spacing:.06em;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  figure{margin:0;}
+  figure img{width:100%;display:block;border-radius:12px;border:1px solid var(--line);background:#fff;}
+  figcaption{font-size:12.5px;color:var(--ink-soft);margin-top:8px;text-align:center;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
+  th{background:#f0f3f9;font-weight:600;font-size:12.5px;color:var(--ink-soft);letter-spacing:.03em;}
+  tbody tr:hover{background:#fafbfd;}
+  td.pin{font-family:var(--mono);color:var(--ink-soft);width:38px;text-align:center;}
+  td.net{font-family:var(--mono);font-weight:600;color:var(--ink);white-space:nowrap;}
+  .hdr-title{
+    font-family:var(--mono);font-weight:700;font-size:14px;padding:10px 12px;
+    background:var(--accent-soft);border-radius:10px 10px 0 0;border:1px solid var(--line);
+    border-bottom:none;display:flex;justify-content:space-between;align-items:center;
+  }
+  .hdr-title .sub{font-family:'Segoe UI',sans-serif;font-weight:400;font-size:11.5px;color:var(--ink-soft);}
+  .hdr-body{border:1px solid var(--line);border-radius:0 0 10px 10px;overflow:hidden;}
+  .hdr-body table{margin:0;}
+
+  .chip{
+    display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;
+    border:1px solid transparent;white-space:nowrap;
+  }
+  .c-i2s{background:#f3e8ff;color:var(--i2s);border-color:#e9d5ff;}
+  .c-i2c{background:#ccfbf1;color:var(--i2c);border-color:#99f6e4;}
+  .c-uart{background:#ffedd5;color:var(--uart);border-color:#fed7aa;}
+  .c-pwr{background:#fee2e2;color:var(--pwr);border-color:#fecaca;}
+  .c-gpio{background:#eef2f7;color:var(--ink-soft);border-color:#e2e7ef;}
+  .c-usb{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe;}
+  .c-na{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0;text-decoration:line-through;}
+
+  .mod{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+    display:flex;flex-direction:column;
+  }
+  .mod h3{margin:0 0 2px;font-size:16px;}
+  .mod .role{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;}
+  .mod table{font-size:12.5px;}
+  .mod th{background:transparent;padding:4px 8px;font-size:11px;}
+  .mod td{padding:4px 8px;}
+  .mod .foot{margin-top:10px;font-size:12px;color:var(--ink-soft);border-top:1px dashed var(--line);padding-top:8px;}
+
+  .note{
+    background:var(--warn-bg);border:1px solid #fed7aa;border-left:4px solid var(--warn);
+    border-radius:10px;padding:14px 18px;margin:14px 0;font-size:13.5px;
+  }
+  .note b{color:var(--warn);}
+  .note ul{margin:8px 0 0;padding-left:20px;}
+  .note li{margin:5px 0;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0;font-size:12.5px;color:var(--ink-soft);}
+  .legend span{display:flex;align-items:center;gap:6px;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media(max-width:900px){.summary-grid{grid-template-columns:1fr 1fr;}}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .stat .k{font-size:11.5px;color:var(--ink-soft);letter-spacing:.05em;}
+  .stat .v{font-family:var(--mono);font-size:18px;font-weight:700;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="tag">Board Reference</div>
+    <h1>ESP32-S3-DevKitC-1 42Pin GOOUUU 果云版 · 底板接口与模块整理</h1>
+    <p>底板为双排 2×21P 母座结构，可插入 42Pin 的 ESP32-S3-DevKitC-1 核心板（单排/双排均可）。板载两路 I2C、两组 I2S、UART0/UART1 引出，并预留 7 个可选焊接模块位。</p>
+    <div class="meta">
+      <span>原理图 V1.0 · A4</span>
+      <span>嘉立创EDA · 2026-09-06</span>
+      <span>核心板 N16R8 · 16MB Flash + 8MB PSRAM</span>
+      <span>板载 RGB LED @ GPIO48</span>
+    </div>
+  </header>
+
+  <figure>
+    <img src="schematic.png" alt="ESP32-S3 果云版底板原理图">
+    <figcaption>你上传的原理图全图（点击可放大查看丝印）</figcaption>
+  </figure>
+
+  <h2>核心与供电概览 <span class="en">CORE &amp; POWER</span></h2>
+  <div class="summary-grid">
+    <div class="stat"><div class="k">主控</div><div class="v">ESP32-S3</div></div>
+    <div class="stat"><div class="k">Flash</div><div class="v">16 MB</div></div>
+    <div class="stat"><div class="k">PSRAM</div><div class="v">8 MB Octal</div></div>
+    <div class="stat"><div class="k">IO 排针</div><div class="v">2 × 21P</div></div>
+  </div>
+  <div class="panel" style="margin-top:16px;">
+    <table>
+      <tbody>
+        <tr><th style="width:150px;">核心板</th><td>ESP32-S3-DevKitC-1 42Pin（果云版），插在底板 U1/U2 两组 21P 母座上；板载 WS2812 RGB LED 接在 <span class="net">GPIO48</span>，BOOT 按键接 <span class="net">GPIO0</span>。</td></tr>
+        <tr><th>3V3 供电</th><td>由核心板 LDO 输出，引到 U2 的第 2、21 脚，供所有 3.3V 模块使用。</td></tr>
+        <tr><th>5V 供电</th><td><span class="net">+5V</span> 从「充放电一体板（锂电池充放电模块）」接入 → 经电源开关 → <span class="net">5VIN</span>（U1 第 21 脚）。若底板 LDO 的 5VIN 直接焊接短接，则开关失效。</td></tr>
+        <tr><th>USB</th><td><span class="net">G19_UD-</span> / <span class="net">G20_UD+</span>（GPIO19/20）为 USB D-/D+，同时引到 U2 的第 13、14 脚。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>排针 / 母座引脚定义 <span class="en">PINOUT</span></h2>
+  <div class="grid2">
+    <div>
+      <div class="hdr-title"><span>U2 · 左排 21P</span><span class="sub">X6511FV-21-C85D32</span></div>
+      <div class="hdr-body">
+        <table>
+          <thead><tr><th class="pin">#</th><th>丝印网络</th><th>功能</th></tr></thead>
+          <tbody>
+            <tr><td class="pin">1</td><td class="net">GND</td><td><span class="chip c-pwr">电源</span></td></tr>
+            <tr><td class="pin">2</td><td class="net">3V3</td><td><span class="chip c-pwr">电源</span></td></tr>
+            <tr><td class="pin">3</td><td class="net">ESP_EN</td><td>核心板使能/复位</td></tr>
+            <tr><td class="pin">4</td><td class="net">G4_WS</td><td><span class="chip c-i2s">I2S</span> 麦克风 WS</td></tr>
+            <tr><td class="pin">5</td><td class="net">G5_SCK</td><td><span class="chip c-i2s">I2S</span> 麦克风 SCK</td></tr>
+            <tr><td class="pin">6</td><td class="net">G6_SD</td><td><span class="chip c-i2s">I2S</span> 麦克风 SD</td></tr>
+            <tr><td class="pin">7</td><td class="net">G7_DIN</td><td><span class="chip c-i2s">I2S</span> 功放 DIN</td></tr>
+            <tr><td class="pin">8</td><td class="net">G15_BCLK</td><td><span class="chip c-i2s">I2S</span> 功放 BCLK</td></tr>
+            <tr><td class="pin">9</td><td class="net">G16_LRC</td><td><span class="chip c-i2s">I2S</span> 功放 LRC</td></tr>
+            <tr><td class="pin">10</td><td class="net">G17_VOL+</td><td>音量+ 按键</td></tr>
+            <tr><td class="pin">11</td><td class="net">G18</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">12</td><td class="net">G8</td><td><span class="chip c-i2c">I2C</span> 传感器总线</td></tr>
+            <tr><td class="pin">13</td><td class="net">G19_UD-</td><td><span class="chip c-usb">USB</span> D-</td></tr>
+            <tr><td class="pin">14</td><td class="net">G20_UD+</td><td><span class="chip c-usb">USB</span> D+</td></tr>
+            <tr><td class="pin">15</td><td class="net">G43_JTAG</td><td><span class="chip c-uart">UART0</span> TX / JTAG</td></tr>
+            <tr><td class="pin">16</td><td class="net">G46_LOG</td><td>日志输出（strapping）</td></tr>
+            <tr><td class="pin">17</td><td class="net">G9</td><td><span class="chip c-i2c">I2C</span> 传感器总线</td></tr>
+            <tr><td class="pin">18</td><td class="net">G10</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">19</td><td class="net">G11_TXD</td><td><span class="chip c-uart">UART1</span> TX</td></tr>
+            <tr><td class="pin">20</td><td class="net">G12_RXD</td><td><span class="chip c-uart">UART1</span> RX</td></tr>
+            <tr><td class="pin">21</td><td class="net">3V3</td><td><span class="chip c-pwr">电源</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div class="hdr-title"><span>U1 · 右排 21P</span><span class="sub">X6511FV-21-C85D32</span></div>
+      <div class="hdr-body">
+        <table>
+          <thead><tr><th class="pin">#</th><th>丝印网络</th><th>功能</th></tr></thead>
+          <tbody>
+            <tr><td class="pin">1</td><td class="net">GND</td><td><span class="chip c-pwr">电源</span></td></tr>
+            <tr><td class="pin">2</td><td class="net">G1</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">3</td><td class="net">G2</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">4</td><td class="net">TX0</td><td><span class="chip c-uart">UART0</span> TX (GPIO43)</td></tr>
+            <tr><td class="pin">5</td><td class="net">RX0</td><td><span class="chip c-uart">UART0</span> RX (GPIO44)</td></tr>
+            <tr><td class="pin">6</td><td class="net">G42_SCL</td><td><span class="chip c-i2c">I2C</span> SCL</td></tr>
+            <tr><td class="pin">7</td><td class="net">G41_SDA</td><td><span class="chip c-i2c">I2C</span> SDA</td></tr>
+            <tr><td class="pin">8</td><td class="net">G40</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">9</td><td class="net">G39_VOL-</td><td>音量- 按键</td></tr>
+            <tr><td class="pin">10</td><td class="net">G38</td><td>GPS 模块第 5 脚</td></tr>
+            <tr><td class="pin">11</td><td class="net">G37</td><td><span class="chip c-na">PSRAM 占用</span></td></tr>
+            <tr><td class="pin">12</td><td class="net">G36</td><td><span class="chip c-na">PSRAM 占用</span></td></tr>
+            <tr><td class="pin">13</td><td class="net">G35</td><td><span class="chip c-na">PSRAM 占用</span></td></tr>
+            <tr><td class="pin">14</td><td class="net">G0_BOOT</td><td>BOOT 按键（strapping）</td></tr>
+            <tr><td class="pin">15</td><td class="net">G45</td><td>strapping 脚</td></tr>
+            <tr><td class="pin">16</td><td class="net">G48</td><td>板载 WS2812 RGB LED</td></tr>
+            <tr><td class="pin">17</td><td class="net">G47</td><td>OLED 数据线</td></tr>
+            <tr><td class="pin">18</td><td class="net">G21</td><td>OLED 数据线</td></tr>
+            <tr><td class="pin">19</td><td class="net">G14</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">20</td><td class="net">G13</td><td><span class="chip c-gpio">通用 IO</span></td></tr>
+            <tr><td class="pin">21</td><td class="net">5VIN</td><td><span class="chip c-pwr">电源</span> 5V 输入</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="chip c-i2s">I2S</span> 音频</span>
+    <span><span class="chip c-i2c">I2C</span> 传感器</span>
+    <span><span class="chip c-uart">UART</span> 串口</span>
+    <span><span class="chip c-usb">USB</span> USB</span>
+    <span><span class="chip c-pwr">电源</span> 电源</span>
+    <span><span class="chip c-na">PSRAM 占用</span> 不可用</span>
+  </div>
+
+  <h2>板载按键 <span class="en">BUTTONS</span></h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th style="width:110px;">按键</th><th style="width:150px;">连接</th><th style="width:190px;">器件</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><b>音量 +</b></td><td class="net">GPIO17 ↔ GND</td><td class="net">KH-4.5X4.5X6H-B3J</td><td>按下拉低，需内部上拉（VOL+ 网络）</td></tr>
+        <tr><td><b>音量 −</b></td><td class="net">GPIO39 ↔ GND</td><td class="net">KH-4.5X4.5X6H-B3J</td><td>按下拉低，需内部上拉（VOL- 网络）</td></tr>
+        <tr><td><b>BOOT</b></td><td class="net">GPIO0 ↔ GND</td><td>核心板板载</td><td>下载模式按键（strapping）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>板载 / 可选模块 <span class="en">ONBOARD MODULES</span></h2>
+  <div class="grid3">
+
+    <div class="mod">
+      <h3>AHT20 + BMP280</h3>
+      <div class="role">温湿度 + 气压传感器 · <span class="chip c-i2c">I2C</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="net">3V3</td></tr>
+          <tr><td>2</td><td class="net">G8</td></tr>
+          <tr><td>3</td><td class="net">GND</td></tr>
+          <tr><td>4</td><td class="net">G9</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">4P 排针焊接位</div>
+    </div>
+
+    <div class="mod">
+      <h3>MPU6050</h3>
+      <div class="role">六轴陀螺仪 + 加速度计 · <span class="chip c-i2c">I2C</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="net">GND</td></tr>
+          <tr><td>2</td><td class="net">3V3</td></tr>
+          <tr><td>3</td><td class="net">G9</td></tr>
+          <tr><td>4</td><td class="net">G8</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">与 AHT20 共用 G8/G9 总线</div>
+    </div>
+
+    <div class="mod">
+      <h3>INMP441 麦克风</h3>
+      <div class="role">数字 MEMS 麦克风 · <span class="chip c-i2s">I2S</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>L/R</td><td class="net">GND</td></tr>
+          <tr><td>WS</td><td class="net">G4</td></tr>
+          <tr><td>SCK</td><td class="net">G5</td></tr>
+          <tr><td>SD</td><td class="net">G6</td></tr>
+          <tr><td>VDD</td><td class="net">3V3</td></tr>
+          <tr><td>GND</td><td class="net">GND</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">L/R 接地 → 左声道</div>
+    </div>
+
+    <div class="mod">
+      <h3>MAX98357</h3>
+      <div class="role">I2S 数字功放 · <span class="chip c-i2s">I2S</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>LRC</td><td class="net">G16</td></tr>
+          <tr><td>BCLK</td><td class="net">G15</td></tr>
+          <tr><td>DIN</td><td class="net">G7</td></tr>
+          <tr><td>GAIN</td><td class="net">GND</td></tr>
+          <tr><td>SD</td><td class="net">3V3</td></tr>
+          <tr><td>VIN</td><td class="net">3V3</td></tr>
+          <tr><td>S+/S−</td><td class="net">喇叭</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">建议腔体喇叭 26×26×9mm；GAIN 接地，SD 拉高使能</div>
+    </div>
+
+    <div class="mod">
+      <h3>OLED 屏母座</h3>
+      <div class="role">8P 2.54mm 单排 · <span class="chip c-i2c">I2C</span>/SPI</div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="net">GND</td></tr>
+          <tr><td>2</td><td class="net">3V3</td></tr>
+          <tr><td>3</td><td class="net">G21</td></tr>
+          <tr><td>4</td><td class="net">G47</td></tr>
+          <tr><td>5</td><td class="net">G45</td></tr>
+          <tr><td>6</td><td class="net">G40</td></tr>
+          <tr><td>7</td><td class="net">G41_SDA</td></tr>
+          <tr><td>8</td><td class="net">G42_SCL</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">可选焊接；I2C 走 7/8 脚，SPI 走 3~6 脚</div>
+    </div>
+
+    <div class="mod">
+      <h3>ATGM336H</h3>
+      <div class="role">GPS / 北斗定位 · <span class="chip c-uart">UART</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="net">GND</td></tr>
+          <tr><td>2</td><td class="net">3V3</td></tr>
+          <tr><td>3</td><td class="net">RX0 (G44)</td></tr>
+          <tr><td>4</td><td class="net">TX0 (G43)</td></tr>
+          <tr><td>5</td><td class="net">G38</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">5P 2.0mm（LAIL-PZ2.0-5P-L）</div>
+    </div>
+
+    <div class="mod">
+      <h3>ML307R-4G</h3>
+      <div class="role">Cat.1 4G 通信模块 · <span class="chip c-uart">UART</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1 BAT</td><td class="net">未连接</td></tr>
+          <tr><td>2 EN</td><td class="net">5VIN</td></tr>
+          <tr><td>3 RXD</td><td class="net">G12</td></tr>
+          <tr><td>4 TXD</td><td class="net">G11</td></tr>
+          <tr><td>5 GND</td><td class="net">GND</td></tr>
+          <tr><td>6 VCC</td><td class="net">5VIN</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">EN 常接高电平；供电走 5V</div>
+    </div>
+
+    <div class="mod">
+      <h3>外接电源开关</h3>
+      <div class="role">SPDT 拨动开关 · <span class="chip c-pwr">电源</span></div>
+      <table>
+        <thead><tr><th>脚</th><th>网络</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="net">5VIN</td></tr>
+          <tr><td>2</td><td class="net">+5V</td></tr>
+          <tr><td>3</td><td class="net">未连接</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">SK12D07L3B；+5V 来自充放电一体板</div>
+    </div>
+
+  </div>
+
+  <h2>GPIO 资源占用总表 <span class="en">GPIO MAP</span></h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th style="width:70px;">GPIO</th><th style="width:130px;">板载用途</th><th style="width:140px;">排针位置</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr><td class="net">0</td><td>BOOT 按键</td><td>U1-14 G0_BOOT</td><td>strapping，决定启动模式</td></tr>
+        <tr><td class="net">1</td><td>—</td><td>U1-2</td><td>通用 IO</td></tr>
+        <tr><td class="net">2</td><td>—</td><td>U1-3</td><td>通用 IO</td></tr>
+        <tr><td class="net">3</td><td>—</td><td>未引出</td><td>strapping</td></tr>
+        <tr><td class="net">4</td><td>INMP441 WS</td><td>U2-4</td><td>I2S 麦克风</td></tr>
+        <tr><td class="net">5</td><td>INMP441 SCK</td><td>U2-5</td><td>I2S 麦克风</td></tr>
+        <tr><td class="net">6</td><td>INMP441 SD</td><td>U2-6</td><td>I2S 麦克风</td></tr>
+        <tr><td class="net">7</td><td>MAX98357 DIN</td><td>U2-7</td><td>I2S 功放</td></tr>
+        <tr><td class="net">8</td><td>传感器 I2C</td><td>U2-12</td><td>AHT20 / MPU6050</td></tr>
+        <tr><td class="net">9</td><td>传感器 I2C</td><td>U2-17</td><td>AHT20 / MPU6050</td></tr>
+        <tr><td class="net">10</td><td>—</td><td>U2-18</td><td>通用 IO</td></tr>
+        <tr><td class="net">11</td><td>ML307R TXD</td><td>U2-19 G11_TXD</td><td>UART1</td></tr>
+        <tr><td class="net">12</td><td>ML307R RXD</td><td>U2-20 G12_RXD</td><td>UART1</td></tr>
+        <tr><td class="net">13</td><td>—</td><td>U1-20</td><td>通用 IO</td></tr>
+        <tr><td class="net">14</td><td>—</td><td>U1-19</td><td>通用 IO</td></tr>
+        <tr><td class="net">15</td><td>MAX98357 BCLK</td><td>U2-8</td><td>I2S 功放</td></tr>
+        <tr><td class="net">16</td><td>MAX98357 LRC</td><td>U2-9</td><td>I2S 功放</td></tr>
+        <tr><td class="net">17</td><td>音量+ 按键</td><td>U2-10 G17_VOL+</td><td>按键到 GND</td></tr>
+        <tr><td class="net">18</td><td>—</td><td>U2-11</td><td>通用 IO</td></tr>
+        <tr><td class="net">19</td><td>USB D−</td><td>U2-13</td><td>USB 数据线</td></tr>
+        <tr><td class="net">20</td><td>USB D+</td><td>U2-14</td><td>USB 数据线</td></tr>
+        <tr><td class="net">21</td><td>OLED</td><td>U1-18</td><td>I2C/SPI 均可</td></tr>
+        <tr><td class="net">26–32</td><td>SPI Flash</td><td>未引出</td><td>Flash 专用</td></tr>
+        <tr><td class="net">33–37</td><td>Octal PSRAM</td><td>U1-13/12/11 (G35/36/37)</td><td>N16R8 下不可用</td></tr>
+        <tr><td class="net">38</td><td>ATGM336H 第 5 脚</td><td>U1-10</td><td>GPS 模块预留</td></tr>
+        <tr><td class="net">39</td><td>音量− 按键</td><td>U1-9 G39_VOL-</td><td>按键到 GND</td></tr>
+        <tr><td class="net">40</td><td>OLED</td><td>U1-8</td><td>SPI 数据线</td></tr>
+        <tr><td class="net">41</td><td>OLED SDA</td><td>U1-7 G41_SDA</td><td>I2C</td></tr>
+        <tr><td class="net">42</td><td>OLED SCL</td><td>U1-6 G42_SCL</td><td>I2C</td></tr>
+        <tr><td class="net">43</td><td>ATGM336H TX0</td><td>U1-4 TX0</td><td>UART0（默认控制台）</td></tr>
+        <tr><td class="net">44</td><td>ATGM336H RX0</td><td>U1-5 RX0</td><td>UART0（默认控制台）</td></tr>
+        <tr><td class="net">45</td><td>—</td><td>U1-15</td><td>strapping</td></tr>
+        <tr><td class="net">46</td><td>日志</td><td>U2-16 G46_LOG</td><td>strapping</td></tr>
+        <tr><td class="net">47</td><td>OLED</td><td>U1-17</td><td>SPI 数据线</td></tr>
+        <tr><td class="net">48</td><td>板载 RGB LED</td><td>U1-16</td><td>WS2812 单灯</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>接线与使用注意 <span class="en">CAUTIONS</span></h2>
+
+  <div class="note">
+    <b>1. GPIO35 / 36 / 37 不可用</b>
+    <ul>
+      <li>N16R8 模组使用 8MB Octal PSRAM，占用了 GPIO33–GPIO37；右排母上标着 G35/G36/G37 的三个脚实际不能当普通 IO 用。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <b>2. UART0 与 GPS 冲突</b>
+    <ul>
+      <li>ATGM336H 接在 <span class="net">GPIO43/44</span>，而这两个脚是 ESP32-S3 的默认串口控制台。若同时使用 GPS，需要关闭控制台日志、改用 USB-CDC 输出，或把 GPS 软件映射到其他 UART。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <b>3. ML307R 的 TX/RX 需核对</b>
+    <ul>
+      <li>原理图上模块 RXD（第 3 脚）接网络 <span class="net">G12_RXD</span>、TXD（第 4 脚）接网络 <span class="net">G11_TXD</span>。网络名以 ESP 侧命名，串口需交叉连接；实际接线前建议实测确认，必要时在固件里对调 TX/RX。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <b>4. 麦克风与功放是两组独立 I2S</b>
+    <ul>
+      <li>INMP441 用 G4/G5/G6，MAX98357 用 G7/G15/G16，时钟引脚不共用。要用同一个 I2S 控制器做「录 + 放」，需要把其中一组改接到相同引脚，或使用两个 I2S 外设。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <b>5. 两路 I2C 总线不要混接</b>
+    <ul>
+      <li>传感器总线：<span class="net">G8 / G9</span>（AHT20、MPU6050）；排针 I2C：<span class="net">G41_SDA / G42_SCL</span>（OLED）。两条总线独立寻址，设备地址冲突时才需要分开。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <b>6. strapping 脚与供电</b>
+    <ul>
+      <li>GPIO0 / 3 / 45 / 46 为 strapping 脚，其中 G45、G46 引到排针，外接电路不要在上电时强拉电平。</li>
+      <li>核心板 3V3 由板载 LDO 提供；5V 需从充放电一体板经 <span class="net">+5V → 电源开关 → 5VIN</span> 接入。若 5VIN 被直接短接到 LDO，开关将失效。</li>
+    </ul>
+  </div>
+
+  <h2>建议的后续动作 <span class="en">NEXT STEPS</span></h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th style="width:60px;">优先级</th><th style="width:230px;">动作</th><th>目的</th></tr></thead>
+      <tbody>
+        <tr><td><span class="chip c-pwr">高</span></td><td>用万用表实测 G8/G9 与传感器模块的通断</td><td>确认 AHT20/MPU6050 的实际焊接与地址</td></tr>
+        <tr><td><span class="chip c-pwr">高</span></td><td>确认核心板型号与 PSRAM 配置（已实测 N16R8）</td><td>排除 G35/36/37 误用</td></tr>
+        <tr><td><span class="chip c-i2c">中</span></td><td>跑一次 I2C 扫描（G8/G9 与 G41/G42）</td><td>确认板上已焊了哪些模块</td></tr>
+        <tr><td><span class="chip c-gpio">低</span></td><td>按模块逐个写驱动示例</td><td>传感器 → OLED → 音频 → 4G/GPS</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

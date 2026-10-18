@@ -1,0 +1,31 @@
+menu "ESP32-S3 Blink Demo"
+
+    choice LED_TYPE
+        prompt "On-board LED type"
+        default LED_TYPE_RGB
+        help
+            Most ESP32-S3 dev boards (DevKitC-1 style, GOOUUU and clones)
+            carry an addressable WS2812 RGB LED. Some boards instead use a
+            plain LED on a single GPIO.
+
+        config LED_TYPE_RGB
+            bool "Addressable RGB LED (WS2812)"
+        config LED_TYPE_GPIO
+            bool "Plain GPIO LED"
+    endchoice
+
+    config LED_GPIO_NUM
+        int "LED GPIO number"
+        range 0 48
+        default 48
+        help
+            GPIO the LED is connected to.
+              - WS2812 RGB LED  -> usually GPIO48 (older DevKitC-1: GPIO38)
+              - Plain LED       -> usually GPIO2
+
+    config LED_BLINK_PERIOD_MS
+        int "Blink period in milliseconds"
+        range 50 10000
+        default 500
+
+endmenu
