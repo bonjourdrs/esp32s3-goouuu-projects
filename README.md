@@ -1,7 +1,7 @@
-# ESP32-S3 GOOUUU 果云版 · 三工程示例
+# ESP32-S3 GOOUUU 果云版 · 六工程示例
 
-ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的三个**独立** ESP-IDF 示例工程，
-分别验证点灯、扬声器、麦克风三条通路。
+ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的六个**独立** ESP-IDF 示例工程，
+从单外设验证（点灯、扬声器、麦克风、六轴传感器）逐步走到多模块联动的完整闭环。
 
 ## 工程列表
 
@@ -10,8 +10,11 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的三个**独�
 | [`01_blink_led`](01_blink_led) | 板载 RGB 灯循环变色 + 心跳日志 | WS2812（RMT） | GPIO48 |
 | [`02_speaker_tone`](02_speaker_tone) | 每 2 秒播放 do-re-mi-sol-do 音阶 | MAX98357（I2S TX） | BCLK=15 / LRC=16 / DIN=7 |
 | [`03_mic_level`](03_mic_level) | 麦克风音量 → RGB 灯亮度 | INMP441（I2S RX）+ WS2812 | WS=4 / SCK=5 / SD=6 |
+| [`04_mpu6050_sound`](04_mpu6050_sound) | 摇晃越强，音调越高、音量越大，静止淡出 | MPU6050（I2C）+ MAX98357 | SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
+| [`05_clap_echo`](05_clap_echo) | 拍手触发回声，倾斜板子换音高，灯随音量闪 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
+| [`06_offline_pet`](06_offline_pet) | 完全离线桌面宠物：说话/拿起/敲击/猛摇/倒扣各有回应，情绪会累积 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
 
-三个工程各自独立编译、烧录，互不依赖。
+六个工程各自独立编译、烧录，互不依赖。
 
 ## 硬件
 
@@ -70,5 +73,8 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的三个**独�
 ├─ tools\           统一构建 / 烧录 / 监视脚本
 ├─ 01_blink_led\
 ├─ 02_speaker_tone\
-└─ 03_mic_level\
+├─ 03_mic_level\
+├─ 04_mpu6050_sound\
+├─ 05_clap_echo\
+└─ 06_offline_pet\
 ```

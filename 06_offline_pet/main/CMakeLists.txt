@@ -1,0 +1,31 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "drivers/mic_inmp441.c"
+        "drivers/speaker_max98357.c"
+        "drivers/imu_mpu6050.c"
+        "drivers/ws2812.c"
+        "audio/audio_detect.c"
+        "audio/audio_player.c"
+        "motion/motion_detect.c"
+        "events/app_event.c"
+        "app/pet_app.c"
+        "assets/audio_assets.c"
+    INCLUDE_DIRS
+        "."
+        "config"
+        "drivers"
+        "audio"
+        "motion"
+        "events"
+        "app"
+        "assets"
+    REQUIRES driver
+    PRIV_REQUIRES esp_driver_rmt esp_driver_i2s esp_driver_i2c esp_timer
+    EMBED_FILES
+        "assets/wav/hello.wav"
+        "assets/wav/pickup.wav"
+        "assets/wav/ouch.wav"
+        "assets/wav/shake_hard.wav"
+        "assets/wav/upside_down.wav"
+)
