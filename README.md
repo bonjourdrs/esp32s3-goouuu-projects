@@ -25,6 +25,22 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的三个**独�
 - 工具链 xtensa-esp32s3-elf，Python 3.10.11
 - 完整环境说明见 [docs/environment.md](docs/environment.md)
 
+## 知识库
+
+接手这套工程前先看 [knowledge/README.md](knowledge/README.md)，里面按阅读顺序整理了从零上手到排错的全套材料：
+
+| 文档 | 内容 |
+|---|---|
+| [01-quickstart.md](knowledge/01-quickstart.md) | 三步编译烧录并验证 |
+| [02-toolchain-setup.md](knowledge/02-toolchain-setup.md) | 从零搭建工具链，含国内镜像加速 |
+| [03-hardware.md](knowledge/03-hardware.md) | 引脚、接线与上电注意事项 |
+| [04-architecture.md](knowledge/04-architecture.md) | 模块划分与音频数据流 |
+| [05-workflow.md](knowledge/05-workflow.md) | 脚本用法、新增工程、提交推送 |
+| [06-tuning.md](knowledge/06-tuning.md) | 麦克风灵敏度、音阶、灯的参数 |
+| [07-troubleshooting.md](knowledge/07-troubleshooting.md) | 编译 / 烧录 / 外设 / 同步排错 |
+| [08-glossary.md](knowledge/08-glossary.md) | I2S、RMT、dBFS 等术语解释 |
+| [09-roadmap.md](knowledge/09-roadmap.md) | 后续可做的扩展方向 |
+
 ## 快速开始
 
 ```powershell
@@ -46,10 +62,11 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的三个**独�
 ```
 .
 ├─ README.md
-├─ docs\            环境与板卡资料
+├─ docs\            板子资料
 │   ├─ environment.md
 │   ├─ board.md
 │   └─ assets\      （原理图、板卡 HTML 参考页）
+├─ knowledge\       知识库（上手 / 架构 / 调参 / 排错 / 术语 / 路线）
 ├─ tools\           统一构建 / 烧录 / 监视脚本
 ├─ 01_blink_led\
 ├─ 02_speaker_tone\
