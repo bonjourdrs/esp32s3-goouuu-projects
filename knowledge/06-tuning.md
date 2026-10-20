@@ -78,3 +78,43 @@ static const uint16_t dur_ms[] = { 260, 260, 260, 320, 520 };
 音符长度和数字音量在 `05_clap_echo/main/audio_out.c`：`TONE_FRAMES` 是时长，默认 250 ms；`AMPLITUDE` 是幅度。麦克风灵敏度仍在 `mic_level.c`，和 03 相同。
 
 调触发阈值前先看串口里安静时的 `level`。这个房间的底噪在 0.15~0.45 之间，所以 `CLAP_LEVEL` 不宜低于 0.5，否则说话就会误触发。
+
+## 离线宠物
+
+全部阈值集中在 `06_offline_pet/main/config/demo_config.h`。
+
+| 常量 | 默认 | 作用 |
+|---|---|---|
+| `VOICE_START_MULTIPLIER` | 3.0 | 起判音量 = 噪声底 × 该倍数，说话轻就调到 2.0 |
+| `VOICE_START_HOLD_MS` | 300 | 音量需持续超过起判值的时长 |
+| `VOICE_END_HOLD_MS` | 500 | 判定「说完了」所需的静音时长，也是响应延迟的主要来源 |
+| `MOTION_STILL_G` | 0.08 | 重力残差低于此值算静止 |
+| `MOTION_MOVE_G` | 0.12 | 残差高于此值算运动 |
+| `PICKUP_STILL_HOLD_MS` | 400 | 拿起前需要先静止多久 |
+| `PICKUP_MOVE_HOLD_MS` | 150 | 拿起需要持续运动多久 |
+| `TAP_THRESHOLD_G` | 2.5 | 敲击的加速度模长门槛 |
+| `TAP_MAX_WIDTH_MS` | 40 | 超过这个脉宽就不算敲击（摇晃会超） |
+| `TAP_REST_BAND_G` | 0.35 | 敲击必须从 1 g 附近起跳 |
+| `SHAKE_WINDOW_MS` | 800 | 摇晃的滑动窗口 |
+| `SHAKE_PEAK_G` | 0.6 | 计入摇晃的峰高门槛 |
+| `SHAKE_HARD_PEAK_G` | 1.0 | 窗口内最大峰需超过此值才算猛摇 |
+| `SHAKE_HARD_PEAK_COUNT` | 3 | 窗口内需要超过这么多个峰 |
+| `UPSIDE_DOWN_AZ_G` | −0.7 | az 低于此值算倒扣 |
+| `UPSIDE_DOWN_HOLD_MS` | 800 | 倒扣需保持多久 |
+
+调参前先看串口。`motion` 任务每 40 个采样点打一行 `MOTION: mag=.. dyn=..`，
+其中 `dyn` 是重力残差，也就是「纯运动强度」，是判断拿起 / 摇晃门槛的直接依据；
+`mag` 是含重力的模长，用于敲击。`audio_capture` 打的是麦克风 `rms`。
+
+几条实测结论：
+
+- **采样率实际是 100 Hz。** 代码请求 200 Hz，但默认 RTOS tick 是 100 Hz，
+  `pdMS_TO_TICKS(5)` 整除后得 0，`vTaskDelayUntil` 会直接断言崩溃。现在用 1 tick 兜底。
+  所有判定都用 `esp_timer` 计时，所以只影响分辨率，不影响阈值语义。
+- **敲击与摇晃靠「起跳点」区分。** 只看模长阈值和脉宽不够：摇晃的每个半周期也可能短于 40 ms。
+  加一条「前一采样点必须落在 1 g ±0.35 g」之后，摇晃和拿起不再被误判成敲击。
+- **拿起事件要求先静止。** 连续动作之间若没有 400 ms 以上的静止，拿起不会触发——
+  这是设计如此，不是 bug。
+- **IMU 上电首次探测偶发失败。** 传感器和功放共用 3V3，功放使能后首次 I2C 探测更容易失败。
+  现在把 IMU 初始化提到扬声器之前，并加了 5 次探测重试。
+

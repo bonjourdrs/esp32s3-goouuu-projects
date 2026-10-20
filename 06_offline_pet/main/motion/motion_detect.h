@@ -14,3 +14,6 @@ void motion_detect_init(void);
 
 /* Feed one sample and append up to max_events events. Returns how many. */
 int motion_detect_update(const imu_sample_t *sample, app_event_t *events, int max_events);
+
+/* Gravity residual from the most recent sample, in g. Exposed for tuning logs. */
+float motion_detect_dynamic(void);

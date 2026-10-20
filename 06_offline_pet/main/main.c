@@ -60,6 +60,15 @@ static void motion_task(void *arg)
     TickType_t wake = xTaskGetTickCount();
     unsigned tick = 0;
 
+    /* pdMS_TO_TICKS rounds down, so at the default 100 Hz tick a 5 ms period
+     * becomes 0 and vTaskDelayUntil asserts. One tick is the floor: the loop
+     * ends up at 100 Hz even though the IMU is configured for 200 Hz. The
+     * detectors time everything off esp_timer, so only resolution changes. */
+    TickType_t period = pdMS_TO_TICKS(MOTION_SAMPLE_PERIOD_MS);
+    if (period == 0) {
+        period = 1;
+    }
+
     while (1) {
         imu_sample_t sample;
         if (imu_read(&sample) == ESP_OK) {
@@ -70,12 +79,13 @@ static void motion_task(void *arg)
             }
 
             if (++tick % 40 == 0) {
-                ESP_LOGI(MOTION_TAG, "mag=%.2fg pitch=%.0f roll=%.0f az=%.2fg",
-                         sample.accel_mag, sample.pitch, sample.roll, sample.az);
+                ESP_LOGI(MOTION_TAG, "mag=%.2fg dyn=%.2fg pitch=%.0f roll=%.0f az=%.2fg",
+                         sample.accel_mag, motion_detect_dynamic(),
+                         sample.pitch, sample.roll, sample.az);
             }
         }
 
-        vTaskDelayUntil(&wake, pdMS_TO_TICKS(MOTION_SAMPLE_PERIOD_MS));
+        vTaskDelayUntil(&wake, period);
     }
 }
 
@@ -86,17 +96,20 @@ void app_main(void)
 
     ESP_ERROR_CHECK(ws2812_init(PIN_LED_RGB));
     ESP_ERROR_CHECK(app_event_init());
+
+    /* The IMU is probed before the amplifier is enabled: they share the 3V3
+     * rail, and turning on the I2S TX makes the first I2C probe less reliable. */
+    esp_err_t imu_err = imu_init();
+    if (imu_err != ESP_OK) {
+        ESP_LOGW(TAG, "IMU unavailable; motion actions are disabled");
+    }
+
     ESP_ERROR_CHECK(mic_init());
     ESP_ERROR_CHECK(speaker_init());
     ESP_ERROR_CHECK(audio_player_init());
 
     audio_detect_init();
     motion_detect_init();
-
-    esp_err_t imu_err = imu_init();
-    if (imu_err != ESP_OK) {
-        ESP_LOGW(TAG, "IMU unavailable; motion actions are disabled");
-    }
 
     xTaskCreate(audio_capture_task, "audio_capture", 4096, NULL, 6, NULL);
     if (imu_err == ESP_OK) {

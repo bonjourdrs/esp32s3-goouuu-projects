@@ -5,33 +5,39 @@
 
 /* ------------------------------------------------------------------ motion */
 
+/* IMU output data rate. The polling loop cannot run faster than the RTOS tick
+ * (10 ms at the default 100 Hz), so samples are actually taken at 100 Hz. */
 #define MOTION_SAMPLE_HZ        200
 #define MOTION_SAMPLE_PERIOD_MS (1000 / MOTION_SAMPLE_HZ)
 
 /* Dynamic acceleration is what is left after the gravity estimate is
  * subtracted, so 0 g means perfectly still. */
 #define MOTION_STILL_G          0.08f
-#define MOTION_MOVE_G           0.15f
+#define MOTION_MOVE_G           0.12f
 
 /* PICK_UP: quiet first, then a sustained burst of motion. */
-#define PICKUP_STILL_HOLD_MS    1000
-#define PICKUP_MOVE_HOLD_MS     200
+#define PICKUP_STILL_HOLD_MS    400
+#define PICKUP_MOVE_HOLD_MS     150
 
 /* Re-arm threshold for the next PICK_UP. */
 #define PUTDOWN_STILL_HOLD_MS   700
 
-/* TAP: a short spike, not a sustained one. The width limit is what separates
- * a tap from a shake, which also drives the accelerometer past the threshold
- * but holds it there for far longer. */
+/* TAP: a short spike that starts from a board at rest. The width limit rejects
+ * spikes that are held up, and the rest band rejects spikes that begin while
+ * the board is already moving - a shake drives the accelerometer just as hard
+ * as a finger does, but never from a resting baseline. */
 #define TAP_THRESHOLD_G         2.5f
 #define TAP_MAX_WIDTH_MS        40
+#define TAP_REST_BAND_G         0.35f
 #define TAP_DEBOUNCE_MS         250
 
-/* SHAKE: peaks counted inside a sliding window. */
-#define SHAKE_WINDOW_MS         500
-#define SHAKE_PEAK_G            0.8f
-#define SHAKE_HARD_PEAK_G       1.5f
-#define SHAKE_HARD_PEAK_COUNT   6
+/* SHAKE: peaks counted inside a sliding window. A wrist shake runs at roughly
+ * 3 Hz and each cycle produces two acceleration peaks, so a window of 800 ms
+ * with four peaks to clear is about 2.5 Hz of real shaking. */
+#define SHAKE_WINDOW_MS         800
+#define SHAKE_PEAK_G            0.6f
+#define SHAKE_HARD_PEAK_G       1.0f
+#define SHAKE_HARD_PEAK_COUNT   3
 #define SHAKE_COOLDOWN_MS       700
 
 /* UPSIDE_DOWN: gravity flips to -1 g on Z and stays there. */

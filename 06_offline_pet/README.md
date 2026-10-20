@@ -9,9 +9,9 @@
 | 动作 | 检测方式 | 回应 | 情绪变化 |
 |---|---|---|---|
 | 说完一句话 | 音量超过噪声底 3 倍并保持 300 ms，之后静音 500 ms | `hello.wav` — "I hear you!" | mood +2 |
-| 把板子拿起来 | 静止 ≥1 s 后持续运动 ≥200 ms | `pickup.wav` — "Hey! You picked me up." | mood +3 |
-| 用手指敲一下 | 加速度模长 >2.5 g 且脉宽 ≤40 ms | `ouch.wav` — "Ouch!" | anger +10 |
-| 猛摇 | 500 ms 窗口内 >6 个 >0.8 g 的动态加速度峰，且峰值 >1.5 g | `shake_hard.wav` — "Stop it, I'm dizzy!" | dizzy +30，anger +5 |
+| 把板子拿起来 | 静止 ≥400 ms 后持续运动 ≥150 ms | `pickup.wav` — "Hey! You picked me up." | mood +3 |
+| 用手指敲一下 | 从静止起跳、加速度模长 >2.5 g 且脉宽 ≤40 ms | `ouch.wav` — "Ouch!" | anger +10 |
+| 猛摇 | 800 ms 窗口内 >3 个 >0.6 g 的动态加速度峰，且峰值 >1.0 g | `shake_hard.wav` — "Stop it, I'm dizzy!" | dizzy +30，anger +5 |
 | 倒扣板子 | az < −0.7 g 持续 800 ms | `upside_down.wav` — "Whoa, I'm upside down!" | — |
 
 板载 WS2812 是情绪灯：**红 = anger，绿 = mood，蓝 = dizzy**，三种按比例混色；每次回应叠一层白光脉冲。
@@ -70,7 +70,7 @@ player 只负责播放**。detector 不直接放音，pet_app 不直接读 I2C/I
 |---|---|---|---|
 | `audio_capture` | 6 | 20 ms（I2S 帧长） | 采一帧 → RMS → `audio_detect` → 发事件 |
 | `audio_player` | 6 | 事件驱动 | 从 flash 流式播放，维护自反馈 guard 窗口 |
-| `motion` | 5 | 5 ms（200 Hz） | 读 IMU → `motion_detect` → 发事件 |
+| `motion` | 5 | 10 ms（受 RTOS tick 限制，约 100 Hz） | 读 IMU → `motion_detect` → 发事件 |
 | `pet` | 4 | 50 ms 唤醒 | 消费事件、更新情绪、驱动灯 |
 
 ## 两个关键设计
@@ -81,6 +81,9 @@ player 只负责播放**。detector 不直接放音，pet_app 不直接读 I2C/I
 
 **敲击 vs 摇晃。** 两者都会让加速度模长冲过阈值，区别在持续时间：敲击是 1~3 个采样点
 （5~15 ms）的尖峰，摇晃则要维持几十毫秒。所以 TAP 判定除了阈值，还要求脉宽 ≤ `TAP_MAX_WIDTH_MS`。
+但仅靠脉宽还不够——摇晃的每个半周期也可能短于 40 ms。所以再加一条：敲击必须**从静止起跳**，
+即越过阈值的前一个采样点要落在 1 g 附近（`TAP_REST_BAND_G`）；摇晃时板子一直在动，这一条会把
+它挡掉。
 
 ## 参数
 

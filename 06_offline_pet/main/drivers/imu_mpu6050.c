@@ -53,63 +53,70 @@ esp_err_t imu_init(void)
         return err;
     }
 
-    for (int addr = 0x68; addr <= 0x69; ++addr) {
-        if (i2c_master_probe(bus, addr, 50) != ESP_OK) {
-            continue;
-        }
+    /* The sensor shares the 3V3 rail with the amplifier, and the very first
+     * probe after power-on sometimes comes back empty. A handful of retries
+     * makes it reliable without hiding a genuinely missing part. */
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        for (int addr = 0x68; addr <= 0x69; ++addr) {
+            if (i2c_master_probe(bus, addr, 50) != ESP_OK) {
+                continue;
+            }
 
-        i2c_device_config_t dev_cfg = {
-            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-            .device_address = addr,
-            /* The motion loop samples at 200 Hz; 400 kHz keeps the bus well
-             * below saturation. */
-            .scl_speed_hz = 400000,
-        };
-        if (i2c_master_bus_add_device(bus, &dev_cfg, &s_imu) != ESP_OK) {
-            s_imu = NULL;
-            break;
-        }
-
-        uint8_t who = 0;
-        if (reg_read(IMU_REG_WHO_AM_I, &who, 1) == ESP_OK && (who == 0x68 || who == 0x70)) {
-            ESP_LOGI(TAG, "%s ready  SDA=GPIO%d SCL=GPIO%d addr=0x%02x WHO_AM_I=0x%02x",
-                     who == 0x70 ? "MPU6500" : "MPU6050",
-                     PIN_IMU_SDA, PIN_IMU_SCL, addr, who);
-
-            ESP_ERROR_CHECK(reg_write(0x6b, 0x80)); /* device reset */
-            vTaskDelay(pdMS_TO_TICKS(100));
-
-            static const uint8_t setup[][2] = {
-                { 0x6b, 0x01 }, /* wake, PLL from X gyro reference */
-                { 0x6c, 0x00 }, /* enable all axes */
-                { 0x1a, 0x03 }, /* DLPF: gyro bandwidth 44 Hz */
-                { 0x19, 0x04 }, /* 1 kHz / (4 + 1) = 200 Hz sample rate */
-                { 0x1b, 0x00 }, /* gyro +/-250 deg/s */
-                { 0x1c, 0x10 }, /* accelerometer +/-8 g */
+            i2c_device_config_t dev_cfg = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address = addr,
+                /* The motion loop samples at 200 Hz; 400 kHz keeps the bus well
+                 * below saturation. */
+                .scl_speed_hz = 400000,
             };
-            for (size_t i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i) {
-                err = reg_write(setup[i][0], setup[i][1]);
-                if (err != ESP_OK) {
-                    return err;
-                }
+            if (i2c_master_bus_add_device(bus, &dev_cfg, &s_imu) != ESP_OK) {
+                s_imu = NULL;
+                continue;
             }
 
-            if (who == 0x70) {
-                /* The MPU6500 keeps its accelerometer filter in a register the
-                 * MPU6050 does not have. */
-                err = reg_write(0x1d, 0x03);
-                if (err != ESP_OK) {
-                    return err;
+            uint8_t who = 0;
+            if (reg_read(IMU_REG_WHO_AM_I, &who, 1) == ESP_OK && (who == 0x68 || who == 0x70)) {
+                ESP_LOGI(TAG, "%s ready  SDA=GPIO%d SCL=GPIO%d addr=0x%02x WHO_AM_I=0x%02x",
+                         who == 0x70 ? "MPU6500" : "MPU6050",
+                         PIN_IMU_SDA, PIN_IMU_SCL, addr, who);
+
+                ESP_ERROR_CHECK(reg_write(0x6b, 0x80)); /* device reset */
+                vTaskDelay(pdMS_TO_TICKS(100));
+
+                static const uint8_t setup[][2] = {
+                    { 0x6b, 0x01 }, /* wake, PLL from X gyro reference */
+                    { 0x6c, 0x00 }, /* enable all axes */
+                    { 0x1a, 0x03 }, /* DLPF: gyro bandwidth 44 Hz */
+                    { 0x19, 0x04 }, /* 1 kHz / (4 + 1) = 200 Hz sample rate */
+                    { 0x1b, 0x00 }, /* gyro +/-250 deg/s */
+                    { 0x1c, 0x10 }, /* accelerometer +/-8 g */
+                };
+                for (size_t i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i) {
+                    err = reg_write(setup[i][0], setup[i][1]);
+                    if (err != ESP_OK) {
+                        return err;
+                    }
                 }
+
+                if (who == 0x70) {
+                    /* The MPU6500 keeps its accelerometer filter in a register the
+                     * MPU6050 does not have. */
+                    err = reg_write(0x1d, 0x03);
+                    if (err != ESP_OK) {
+                        return err;
+                    }
+                }
+
+                vTaskDelay(pdMS_TO_TICKS(100));
+                return ESP_OK;
             }
 
-            vTaskDelay(pdMS_TO_TICKS(100));
-            return ESP_OK;
+            ESP_LOGW(TAG, "unexpected device at 0x%02x: WHO_AM_I=0x%02x", addr, who);
+            i2c_master_bus_rm_device(s_imu);
+            s_imu = NULL;
         }
 
-        ESP_LOGW(TAG, "unexpected device at 0x%02x: WHO_AM_I=0x%02x", addr, who);
-        i2c_master_bus_rm_device(s_imu);
-        s_imu = NULL;
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 
     i2c_del_master_bus(bus);

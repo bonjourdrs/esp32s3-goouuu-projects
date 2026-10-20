@@ -30,6 +30,8 @@ static int64_t s_still_before_burst_us;
 /* tap */
 static int64_t s_above_since_us;
 static bool s_above_is_tap;
+static float s_above_peak_g;
+static float s_prev_mag;
 static int64_t s_last_tap_us;
 
 /* shake */
@@ -43,6 +45,13 @@ static int64_t s_shake_until_us;
 /* upside down */
 static int64_t s_upside_since_us;
 static bool s_upside_armed;
+
+static float s_last_dynamic;
+
+float motion_detect_dynamic(void)
+{
+    return s_last_dynamic;
+}
 
 void motion_detect_init(void)
 {
@@ -58,6 +67,8 @@ void motion_detect_init(void)
 
     s_above_since_us = 0;
     s_above_is_tap = false;
+    s_above_peak_g = 0.0f;
+    s_prev_mag = 1.0f;
     s_last_tap_us = 0;
 
     s_peak_head = 0;
@@ -67,6 +78,8 @@ void motion_detect_init(void)
 
     s_upside_since_us = 0;
     s_upside_armed = true;
+
+    s_last_dynamic = 0.0f;
 }
 
 /* How many shake peaks fall inside the sliding window, and how big the
@@ -115,6 +128,7 @@ int motion_detect_update(const imu_sample_t *sample, app_event_t *events, int ma
         dynamic_sq += residual * residual;
     }
     float dynamic = sqrtf(dynamic_sq);
+    s_last_dynamic = dynamic;
 
     bool still_now = dynamic < MOTION_STILL_G;
     bool moving_now = dynamic > MOTION_MOVE_G;
@@ -162,17 +176,25 @@ int motion_detect_update(const imu_sample_t *sample, app_event_t *events, int ma
     if (sample->accel_mag > TAP_THRESHOLD_G) {
         if (s_above_since_us == 0) {
             s_above_since_us = now;
-            s_above_is_tap = true;
-        } else if ((now - s_above_since_us) > (int64_t)TAP_MAX_WIDTH_MS * 1000) {
-            /* Held above the threshold for too long: a shake, not a tap. */
-            s_above_is_tap = false;
+            /* A tap starts from a resting board: the previous sample has to sit
+             * near 1 g. A shake is already moving, so its spikes are rejected. */
+            s_above_is_tap = fabsf(s_prev_mag - 1.0f) < TAP_REST_BAND_G;
+            s_above_peak_g = sample->accel_mag;
+        } else {
+            if (sample->accel_mag > s_above_peak_g) {
+                s_above_peak_g = sample->accel_mag;
+            }
+            if ((now - s_above_since_us) > (int64_t)TAP_MAX_WIDTH_MS * 1000) {
+                /* Held above the threshold for too long: a shake, not a tap. */
+                s_above_is_tap = false;
+            }
         }
     } else {
         if (s_above_since_us != 0 && s_above_is_tap &&
             (now - s_last_tap_us) >= (int64_t)TAP_DEBOUNCE_MS * 1000) {
             if (n < max_events) {
                 events[n].type = EVENT_TAP;
-                events[n].value = sample->accel_mag;
+                events[n].value = s_above_peak_g;
                 events[n].timestamp_ms = (uint32_t)(now / 1000);
                 ++n;
             }
@@ -180,6 +202,7 @@ int motion_detect_update(const imu_sample_t *sample, app_event_t *events, int ma
         }
         s_above_since_us = 0;
         s_above_is_tap = false;
+        s_above_peak_g = 0.0f;
     }
 
     /* ------------------------------------------------------------ shake */
@@ -233,6 +256,8 @@ int motion_detect_update(const imu_sample_t *sample, app_event_t *events, int ma
             s_upside_armed = true;
         }
     }
+
+    s_prev_mag = sample->accel_mag;
 
     return n;
 }
