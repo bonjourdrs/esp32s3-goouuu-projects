@@ -89,7 +89,7 @@
 | **MAX98357** | I2S 数字功放 · I2S | LRC→G16、BCLK→G15、DIN→G7、GAIN→GND、SD→3V3 |
 | OLED 屏母座 | 8P 2.54mm · I2C/SPI | GND/3V3/G21/G47/G45/G40/G41_SDA/G42_SCL |
 | ATGM336H | GPS / 北斗 · UART | GND / 3V3 / RX0(G44) / TX0(G43) / G38（5P 2.0mm） |
-| ML307R-4G | Cat.1 4G 模块 · UART | EN→5VIN、RXD→G12、TXD→G11、VCC→5VIN |
+| ML307R-4G | Cat.1 4G 模块 · UART | EN→5VIN、RXD→G12、TXD→G11、VCC→5VIN（已实测，见下方注意 3） |
 | 外接电源开关 | SPDT 拨动开关 | 5VIN / +5V |
 
 ## GPIO 资源占用总表
@@ -107,8 +107,8 @@
 | 8 | 传感器 I2C | U2-12 | AHT20 / MPU6050 |
 | 9 | 传感器 I2C | U2-17 | AHT20 / MPU6050 |
 | 10 | — | U2-18 | 通用 IO |
-| 11 | ML307R TXD | U2-19 | UART1 |
-| 12 | ML307R RXD | U2-20 | UART1 |
+| 11 | ML307R TXD（模组侧） | U2-19 | UART1，ESP 侧作 RX |
+| 12 | ML307R RXD（模组侧） | U2-20 | UART1，ESP 侧作 TX |
 | 13 | — | U1-20 | 通用 IO |
 | 14 | — | U1-19 | 通用 IO |
 | 15 | MAX98357 BCLK | U2-8 | I2S 功放 |
@@ -136,17 +136,25 @@
 
 1. **GPIO35 / 36 / 37 不可用** —— N16R8 使用 8MB Octal PSRAM，占用 GPIO33–37。
 2. **UART0 与 GPS 冲突** —— ATGM336H 接 GPIO43/44，而这是默认串口控制台；同时使用需关闭控制台或改用 USB-CDC。
-3. **ML307R 的 TX/RX 需核对** —— 原理图网络名以 ESP 侧命名，串口需交叉连接，实测确认后再定。
+3. **ML307R 的 TX/RX 已实测确认** —— 网络名按**模组侧**命名：模组 RXD 接 G12、TXD 接 G11，
+   因此 ESP 侧要 **TX=GPIO12、RX=GPIO11**（交叉连接）。反过来接收不到任何应答。
+   实测记录见 `09_ml307_probe`。
 4. **麦克风与功放是两组独立 I2S** —— INMP441 用 G4/G5/G6，MAX98357 用 G7/G15/G16，时钟不共用；
    要用同一 I2S 控制器做「录 + 放」需改接引脚或使用两个 I2S 外设。
 5. **两路 I2C 总线不要混接** —— 传感器总线 G8/G9（AHT20、MPU6050）；排针 I2C G41_SDA/G42_SCL（OLED）。
 6. **strapping 脚与供电** —— GPIO0/3/45/46 为 strapping，外接电路不要在上电时强拉电平；
    5V 需经 `+5V → 电源开关 → 5VIN` 接入，若 5VIN 直接短接到 LDO，开关会失效。
 
-## 本仓库三个工程用到的引脚
+## 各工程用到的引脚
 
 | 工程 | 外设 | 引脚 |
 |---|---|---|
 | 01_blink_led | WS2812 RGB | GPIO48 |
 | 02_speaker_tone | MAX98357 | BCLK=15、LRC=16、DIN=7 |
 | 03_mic_level | INMP441 + WS2812 | WS=4、SCK=5、SD=6、LED=48 |
+| 04_mpu6050_sound | MPU6050 + MAX98357 | SDA=8、SCL=9、BCLK=15、LRC=16、DIN=7 |
+| 05_clap_echo | INMP441 + MAX98357 + MPU6050 | WS=4、SCK=5、SD=6、BCLK=15、LRC=16、DIN=7、SDA=8、SCL=9 |
+| 06_offline_pet | INMP441 + MAX98357 + MPU6050 + WS2812 | WS=4、SCK=5、SD=6、BCLK=15、LRC=16、DIN=7、SDA=8、SCL=9、LED=48 |
+| 07_env_sensor | AHT20 + BMP280 + WS2812 | SDA=8、SCL=9、LED=48 |
+| 08_st7789_lcd | ST7789 LCD（SPI） | SCLK=21、MOSI=47、CS=41、DC=40、RST=45、BL=42 |
+| 09_ml307_probe | ML307R | ESP TX=12、ESP RX=11 |

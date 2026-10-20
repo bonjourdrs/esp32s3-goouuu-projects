@@ -1,0 +1,44 @@
+dependencies:
+  78/esp-ml307:
+    component_hash: 9283b9e7beda6a803cb41b8b92d977267085643bfc7c0656077ef710b7b88005
+    dependencies:
+    - name: 78/uart-uhci
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target not in [esp32]
+      version: ^0.4.1
+    - matches:
+      - if: idf_version >=6.0
+      name: espressif/mqtt
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.0.0
+    - name: idf
+      require: private
+      version: '>=5.5.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.8.1
+  78/uart-uhci:
+    component_hash: c9230a65f9c5dc1b87d97612d5dfd4b79a37cf0cb62123f7d659e5d4e2e0f193
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.5.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.4.1
+  idf:
+    source:
+      type: idf
+    version: 5.5.6
+direct_dependencies:
+- 78/esp-ml307
+- 78/uart-uhci
+- idf
+manifest_hash: 9b2fab3fd23876980f251bff21b9d9d75e1fc8ff8230bc0721dfcab1a71fdc4b
+target: esp32s3
+version: 2.0.0

@@ -15,8 +15,9 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的八个**独�
 | [`06_offline_pet`](06_offline_pet) | 完全离线桌面宠物：说话/拿起/敲击/猛摇/倒扣各有回应，情绪会累积 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
 | [`07_env_sensor`](07_env_sensor) | 温湿度与气压读数，灯随温度变色 | AHT20 + BMP280（I2C）+ WS2812 | SDA=8 / SCL=9；GPIO48 |
 | [`08_st7789_lcd`](08_st7789_lcd) | 240×240 彩条、文字、动态方块与帧计数 | ST7789（SPI） | SCK=21 / MOSI=47 / RST=45 / DC=40 / CS=41 / BL=42 |
+| [`09_ml307_probe`](09_ml307_probe) | 识别 ML307R 4G 模组、读型号/IMEI，无 SIM 时按预期停在无卡状态 | ML307R（UART + UHCI DMA） | ESP TX=12 / ESP RX=11 |
 
-八个工程各自独立编译、烧录，互不依赖。
+九个工程各自独立编译、烧录，互不依赖。
 
 ## 硬件
 
@@ -80,5 +81,6 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的八个**独�
 ├─ 05_clap_echo\
 ├─ 06_offline_pet\
 ├─ 07_env_sensor\
-└─ 08_st7789_lcd\
+├─ 08_st7789_lcd\
+└─ 09_ml307_probe\
 ```

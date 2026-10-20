@@ -1,0 +1,8 @@
+dependencies:
+  idf: ">=5.5.2"
+  78/esp-ml307: "^3.8.1"
+  # at_uart.h is a public header of esp-ml307 but includes uart_uhci.h, which
+  # esp-ml307 only lists as a private requirement. Declaring it here makes the
+  # include path visible to this project. Drop this if upstream moves it to
+  # REQUIRES.
+  78/uart-uhci: "^0.4.1"
