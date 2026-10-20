@@ -13,6 +13,7 @@ esp32s3-goouuu-projects\
 ├─ 05_clap_echo\        拍手 → 回声，倾斜选音高
 ├─ 06_offline_pet\      离线桌面宠物（说 / 拿 / 敲 / 摇 / 翻）
 ├─ 07_env_sensor\       温湿度 + 气压（AHT20 + BMP280）
+├─ 08_st7789_lcd\       ST7789 240×240 屏幕绘制
 ├─ docs\                板子资料（原理图、引脚手册）
 ├─ knowledge\           本知识库
 └─ tools\               构建 / 烧录 / 监视脚本
@@ -51,6 +52,7 @@ esp32s3-goouuu-projects\
 | 05_clap_echo | driver | esp_driver_rmt, esp_driver_i2s, esp_driver_i2c, esp_timer |
 | 06_offline_pet | driver | esp_driver_rmt, esp_driver_i2s, esp_driver_i2c, esp_timer |
 | 07_env_sensor | driver | esp_driver_i2c, esp_driver_rmt |
+| 08_st7789_lcd | — | esp_lcd, esp_driver_spi, esp_driver_gpio, esp_timer |
 
 ## 模块职责
 

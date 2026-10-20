@@ -1,7 +1,7 @@
-# ESP32-S3 GOOUUU 果云版 · 六工程示例
+# ESP32-S3 GOOUUU 果云版 · 八工程示例
 
-ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的六个**独立** ESP-IDF 示例工程，
-从单外设验证（点灯、扬声器、麦克风、六轴传感器）逐步走到多模块联动的完整闭环。
+ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的八个**独立** ESP-IDF 示例工程，
+从单外设验证（点灯、扬声器、麦克风、六轴传感器、屏幕）逐步走到多模块联动的完整闭环。
 
 ## 工程列表
 
@@ -13,8 +13,10 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的六个**独�
 | [`04_mpu6050_sound`](04_mpu6050_sound) | 摇晃越强，音调越高、音量越大，静止淡出 | MPU6050（I2C）+ MAX98357 | SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
 | [`05_clap_echo`](05_clap_echo) | 拍手触发回声，倾斜板子换音高，灯随音量闪 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
 | [`06_offline_pet`](06_offline_pet) | 完全离线桌面宠物：说话/拿起/敲击/猛摇/倒扣各有回应，情绪会累积 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
+| [`07_env_sensor`](07_env_sensor) | 温湿度与气压读数，灯随温度变色 | AHT20 + BMP280（I2C）+ WS2812 | SDA=8 / SCL=9；GPIO48 |
+| [`08_st7789_lcd`](08_st7789_lcd) | 240×240 彩条、文字、动态方块与帧计数 | ST7789（SPI） | SCK=21 / MOSI=47 / RST=45 / DC=40 / CS=41 / BL=42 |
 
-六个工程各自独立编译、烧录，互不依赖。
+八个工程各自独立编译、烧录，互不依赖。
 
 ## 硬件
 
@@ -76,5 +78,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的六个**独�
 ├─ 03_mic_level\
 ├─ 04_mpu6050_sound\
 ├─ 05_clap_echo\
-└─ 06_offline_pet\
+├─ 06_offline_pet\
+├─ 07_env_sensor\
+└─ 08_st7789_lcd\
 ```
