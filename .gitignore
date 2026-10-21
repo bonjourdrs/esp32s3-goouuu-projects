@@ -7,10 +7,6 @@ sdkconfig.old
 # ---- managed components (re-fetched from idf_component.yml) ----
 managed_components/
 
-# ---- independent app repositories (keep their own .git) ----
-/xiaozhi-esp32/
-/esp-ml307-src/
-
 # ---- logs / temp ----
 *.log
 *.tmp
