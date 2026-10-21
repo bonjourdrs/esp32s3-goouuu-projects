@@ -158,3 +158,6 @@
 | 07_env_sensor | AHT20 + BMP280 + WS2812 | SDA=8、SCL=9、LED=48 |
 | 08_st7789_lcd | ST7789 LCD（SPI） | SCLK=21、MOSI=47、CS=41、DC=40、RST=45、BL=42 |
 | 09_ml307_probe | ML307R | ESP TX=12、ESP RX=11 |
+
+尚未被任何工程使用：ATGM336H GPS（G43/G44，与日志串口冲突）、音量 +/− 按键（GPIO17/GPIO39）。
+BOOT 键只用于下载。8P 母座由 08 按四线 SPI 驱动 ST7789，不是 I2C OLED。详见 [knowledge/03-hardware.md](../knowledge/03-hardware.md#模块覆盖情况)。

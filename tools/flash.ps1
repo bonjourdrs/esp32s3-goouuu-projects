@@ -17,6 +17,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $projPath = Join-Path $repoRoot $Project
 if (-not (Test-Path $projPath)) { throw "Project not found: $projPath" }
 
+if ($Project -eq 'xiaozhi-esp32') {
+    Write-Host "xiaozhi-esp32 is an independent app repo. Flash it inside its own directory:" -ForegroundColor Yellow
+    Write-Host "  cd xiaozhi-esp32"
+    Write-Host "  idf.py -p $Port flash monitor"
+    exit 1
+}
+if ($Project -eq 'esp-ml307-src') {
+    Write-Host "esp-ml307-src is a component source copy and has no standalone firmware. See knowledge/11-ml307-component.md" -ForegroundColor Yellow
+    exit 1
+}
+
 . (Join-Path $PSScriptRoot 'env.ps1')
 
 if (-not $BuildDir) {

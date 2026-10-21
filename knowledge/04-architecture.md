@@ -14,10 +14,15 @@ esp32s3-goouuu-projects\
 ├─ 06_offline_pet\      离线桌面宠物（说 / 拿 / 敲 / 摇 / 翻）
 ├─ 07_env_sensor\       温湿度 + 气压（AHT20 + BMP280）
 ├─ 08_st7789_lcd\       ST7789 240×240 屏幕绘制
+├─ 09_ml307_probe\      ML307R 4G 模组识别与 AT 通道
+├─ xiaozhi-esp32\       AI 随身助手应用（独立 Git 仓库）
+├─ esp-ml307-src\       esp-ml307 组件源码副本（独立 Git 仓库）
 ├─ docs\                板子资料（原理图、引脚手册）
 ├─ knowledge\           本知识库
 └─ tools\               构建 / 烧录 / 监视脚本
 ```
+
+`xiaozhi-esp32` 和 `esp-ml307-src` 各自保留 `.git` 与上游远端，父仓库的 `.gitignore` 已排除这两个目录，避免嵌套仓库被误提交。示例工程用 `tools/*.ps1` 构建，构建产物在 `D:\esp32\build\<工程名>`；`xiaozhi-esp32` 用自带的 `scripts/build.py`，构建目录在工程内部。两者的关系和集成细节见 [10-xiaozhi-assistant.md](10-xiaozhi-assistant.md)。
 
 模块源码在用到它的工程里各存一份：`ws2812` 出现在 01、03、05、06，麦克风采集出现在 03、05、06，IMU 出现在 04、05、06。这是刻意的，好处是任何工程单独拷走一个目录就能编译；代价是改一处要同步改几处。等共享代码再重一些，可以抽成公共组件用 `EXTRA_COMPONENT_DIRS` 引入。
 
@@ -53,6 +58,7 @@ esp32s3-goouuu-projects\
 | 06_offline_pet | driver | esp_driver_rmt, esp_driver_i2s, esp_driver_i2c, esp_timer |
 | 07_env_sensor | driver | esp_driver_i2c, esp_driver_rmt |
 | 08_st7789_lcd | — | esp_lcd, esp_driver_spi, esp_driver_gpio, esp_timer |
+| 09_ml307_probe | 78__esp-ml307 | esp_driver_uart, esp_driver_gpio, esp_pm |
 
 ## 模块职责
 

@@ -1,14 +1,73 @@
-# MPU6050 摇晃变声
+# 摇晃变声
 
-接线：MPU6050 SDA→GPIO8，SCL→GPIO9，VCC→3V3，GND→GND。自动识别地址 0x68/0x69。MAX98357 使用 GPIO15 BCLK / GPIO16 LRC / GPIO7 DIN。
+摇得越猛，声音越大、音调越高；停下后声音淡出。用 MPU6050/MPU6500 的三轴加速度驱动 MAX98357 发声，是第一个把传感器和音频联动起来的工程。
 
-启动时短暂保持静止。摇晃越强，音量越大、音高越高（220–1760 Hz）；停止后声音淡出。低通估计重力后计算三轴动态加速度，带噪声门和平滑。转动板子也可能产生短暂声音。采样失败立即静音；未识别到 MPU6050 时输出接线提示。
+## 行为
 
-在仓库根目录运行 tools/build.ps1 -Project 04_mpu6050_sound，随后 tools/flash.ps1 -Project 04_mpu6050_sound -Port COM4。
+- 20 ms 读一次加速度（±4 g，8192 LSB/g），用低通滤波估计重力方向，再算三轴动态加速度的模长。
+- 动态加速度先减噪声门 `NOISE_GATE_G`（0.08 g），再按 `FULL_SHAKE_G`（1.5 g）归一化到 0–1。
+- 包络做非对称平滑：上升系数 0.55（跟手），下降系数 0.10（淡出），低于 0.005 直接归零。
+- 音量 = `MAX_AMPLITUDE`（8000）× 包络；频率 = 220 Hz + 1540 Hz × 包络，即 220–1760 Hz。
+- 音频 24 kHz、16 bit、立体声，每块 240 帧；振幅和频率每样本向目标值缓动，避免爆音。
+- 传感器 250 ms 没有新数据就静音；连续读失败会打印警告，不会一直响。
 
-调参在 main/main.c：NOISE_GATE_G 是静止噪声门；FULL_SHAKE_G 越小越灵敏；MAX_AMPLITUDE 控制最大音量。
+## 接线
 
-寄存器依据：https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf
+| 模块 | 引脚 |
+|---|---|
+| MPU6050 SDA | GPIO8 |
+| MPU6050 SCL | GPIO9 |
+| MPU6050 VCC / GND | 3V3 / GND |
+| MAX98357 BCLK | GPIO15 |
+| MAX98357 LRC | GPIO16 |
+| MAX98357 DIN | GPIO7 |
+| MAX98357 SD / GAIN | 3V3 / GND |
 
-实板识别：I2C 地址 0x68、WHO_AM_I=0x70，对应 MPU6500。程序兼容 MPU6050（0x68）和 MPU6500（0x70），并单独配置 MPU6500 加速度低通滤波器。
-官方参考：https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6500-Register-Map2.pdf
+I2C 会自动探测 0x68 和 0x69，并读 `WHO_AM_I` 确认型号。实板返回 0x70，是 MPU6500；它与 MPU6050 寄存器兼容，但加速度低通滤波器在单独的 0x1d 寄存器，代码里单独处理。
+
+## 运行
+
+```powershell
+.\tools\build.ps1   -Project 04_mpu6050_sound
+.\tools\flash.ps1   -Project 04_mpu6050_sound -Port COM4
+.\tools\monitor.ps1 -Project 04_mpu6050_sound -Port COM4
+```
+
+## 验证现象
+
+上电后先保持静止几秒，等重力基准收敛，然后摇晃板子。串口每 25 次采样（约 0.5 秒）打印一行：
+
+```
+I (3200) SHAKE: motion=0.412g level=0.28 tone=651Hz
+I (5200) SHAKE: motion=0.003g level=0.00 tone=220Hz (silent)
+```
+
+静止时 `level` 应回到 0，喇叭没有持续音。未识别到传感器时串口会打印接线提示并停止。
+
+## 文件结构
+
+| 文件 | 作用 |
+|---|---|
+| `main/main.c` | I2C 初始化、加速度采样、包络计算、I2S 发声任务 |
+
+采样任务和发声任务通过一个长度为 1 的队列传包络值，发声任务只取最新值，不积压。
+
+## 调参
+
+都在 `main/main.c` 顶部：
+
+| 常量 | 默认 | 作用 |
+|---|---|---|
+| `NOISE_GATE_G` | 0.08 | 静止噪声门，环境振动大就调高 |
+| `FULL_SHAKE_G` | 1.5 | 达到满音量的动态加速度，调小更灵敏 |
+| `MAX_AMPLITUDE` | 8000 | 最大数字音量 |
+| `SAMPLE_RATE` | 24000 | 发声采样率 |
+| `FRAMES` | 240 | 每块帧数，影响延迟和 DMA 粒度 |
+
+音高映射在 `target_hz = 220.0f + 1540.0f * level`，改这一行就能换音域。
+
+## 注意
+
+- 上电时如果正在晃动，重力基准会偏，表现为静止后仍有轻微声音；放平稳再复位即可。
+- 转动板子也会产生短促声音，这是动态加速度的正常响应，不是误触发。
+- 传感器读失败会立即静音，这是为了避免 I2C 卡住时留下持续音。

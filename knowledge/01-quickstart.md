@@ -31,7 +31,7 @@ I (12345) BLINK: heartbeat  uptime=5s  free_heap=380000 B  led_step=10
 
 ## 换工程
 
-三个工程互相独立，切换只改 `-Project` 后面的名字。它们不共用构建目录，`D:\esp32\build\` 下会各建一个。
+九个示例工程互相独立，切换只改 `-Project` 后面的名字。它们不共用构建目录，`D:\esp32\build\` 下会各建一个。
 
 ```powershell
 .\tools\build.ps1 -Project 03_mic_level

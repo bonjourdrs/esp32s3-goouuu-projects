@@ -40,6 +40,10 @@ ML307A / ML307R / EC801E / NT26K，自动识别型号。它要求 **C++23**（�
 在 ESP32-S3 上，组件会把 `78/uart-uhci` 一起拉下来（`idf_component.yml` 里的
 `target not in [esp32]` 规则）。所以 `managed_components/` 下会有两个目录，都不入库。
 
+组件源码的本地副本在 [`../esp-ml307-src`](../esp-ml307-src)（3.8.1），用于阅读 AT 通道实现和对照日志；
+构建仍然走组件管理器，改本地副本不会影响本工程，细节见
+[../knowledge/11-ml307-component.md](../knowledge/11-ml307-component.md)。
+
 ## 启动流程
 
 ```

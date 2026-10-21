@@ -1,6 +1,6 @@
 # 知识库
 
-接手这套工程需要知道的内容都集中在这里。代码在仓库根目录的三个工程文件夹里，本目录只放给人读的材料。
+接手这套工程需要知道的内容都集中在这里。代码分布在 01–09 九个独立示例、`xiaozhi-esp32` 应用工程和 `esp-ml307-src` 组件副本中，本目录只放给人读的材料。
 
 ## 阅读顺序
 
@@ -11,12 +11,20 @@
 | 1 | [01-quickstart.md](01-quickstart.md) | 接上板子，编译、烧录、看到串口输出 |
 | 2 | [02-toolchain-setup.md](02-toolchain-setup.md) | 在另一台电脑上从零装出一样的工具链 |
 | 3 | [03-hardware.md](03-hardware.md) | 看懂底板引脚，知道模块接在哪、哪些脚不能碰 |
-| 4 | [04-architecture.md](04-architecture.md) | 说清三个工程的模块划分和音频数据流 |
+| 4 | [04-architecture.md](04-architecture.md) | 说清示例工程的模块划分、音频数据流和仓库分层 |
 | 5 | [05-workflow.md](05-workflow.md) | 按仓库约定新增工程并提交 |
 | 6 | [06-tuning.md](06-tuning.md) | 改麦克风灵敏度、换音阶、调灯的颜色 |
 | 7 | [07-troubleshooting.md](07-troubleshooting.md) | 独立定位编译、烧录、串口、外设的常见故障 |
 
-[08-glossary.md](08-glossary.md) 和 [09-roadmap.md](09-roadmap.md) 按需查阅：前者解释 I2S、RMT、dBFS 这类术语，后者列出还没做的扩展方向。
+按需查阅：
+
+| 文档 | 内容 |
+|---|---|
+| [08-glossary.md](08-glossary.md) | I2S、RMT、dBFS 等术语解释 |
+| [09-roadmap.md](09-roadmap.md) | 还没做的扩展方向 |
+| [10-xiaozhi-assistant.md](10-xiaozhi-assistant.md) | AI 随身助手：双网络、传感器工具、摇一摇、构建与已知问题 |
+| [11-ml307-component.md](11-ml307-component.md) | esp-ml307 组件结构、AT 通道与本地副本说明 |
+| [12-code-review-backlog.md](12-code-review-backlog.md) | 代码审查遗留项：已修清单与暂缓项及后续方案 |
 
 ## 与 docs/ 的分工
 
