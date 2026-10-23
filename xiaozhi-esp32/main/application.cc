@@ -141,8 +141,9 @@ void Application::Initialize() {
                 display->SetStatus(Lang::Strings::DETECTING_MODULE);
                 break;
             case NetworkEvent::ModemErrorNoSim:
-                Alert(Lang::Strings::ERROR, Lang::Strings::PIN_ERROR, "warning",
-                      Lang::Sounds::OGG_ERR_PIN);
+                // 没插卡是常见的启动状态，不弹告警打断用户，只留日志；
+                // 降级/回配网由 DualNetworkBoard 负责
+                ESP_LOGW(TAG, "Modem reports no SIM card, fall back silently");
                 break;
             case NetworkEvent::ModemErrorRegDenied:
                 Alert(Lang::Strings::ERROR, Lang::Strings::REG_ERROR, "warning",

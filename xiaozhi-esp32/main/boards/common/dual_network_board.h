@@ -39,6 +39,8 @@ private:
     std::atomic<bool> wifi_was_connected_{false};
     // 自动模式下 4G 不可用时只安排一次重启，避免反复触发
     std::atomic<bool> cellular_recovery_scheduled_{false};
+    // 配网热点只启动一次，避免 4G 重连反复拉起
+    std::atomic<bool> provisioning_ap_started_{false};
 
     // ML307的引脚配置
     gpio_num_t ml307_tx_pin_;
@@ -63,6 +65,10 @@ private:
 
     static void OnWifiFallbackTimeout(void* arg);
     static void OnCellularRecoveryTimeout(void* arg);
+
+    // 打开配网热点（复用 WiFi 板卡原来的热点与网页），
+    // network_ready 表示当前 4G 是否已经可用
+    void StartProvisioningAp(bool network_ready);
 
 public:
     DualNetworkBoard(gpio_num_t ml307_tx_pin, gpio_num_t ml307_rx_pin, gpio_num_t ml307_dtr_pin = GPIO_NUM_NC, int32_t default_net_type = 1, int ml307_baud_rate = 921600);
