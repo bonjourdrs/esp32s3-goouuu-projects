@@ -431,6 +431,8 @@ void SensorHub::EnvironmentTask() {
             if (bmp_ok) {
                 env_.pressure_hpa = pressure;
                 env_.pressure_valid = true;
+                env_.bmp_temperature_c = bmp_temperature;
+                env_.bmp_temperature_valid = true;
                 env_.bmp_updated_us = esp_timer_get_time();
 
                 s_pressure_history[s_pressure_head] = pressure;
@@ -496,6 +498,17 @@ void SensorHub::MotionTask() {
     int64_t detect_start_us = esp_timer_get_time() + 3000000;
 
     TickType_t last_wake = xTaskGetTickCount();
+
+    // Mahony 互补滤波姿态估计：陀螺积分 + 加速度计重力校正。
+    // 没有磁力计，roll/pitch 收敛稳定，yaw 允许缓慢漂移。
+    constexpr float kMahonyKp = 1.0f;
+    constexpr float kMahonyKi = 0.05f;
+    constexpr float kDegToRad = 0.017453292519943295f;
+    float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
+    float integral_x = 0.0f, integral_y = 0.0f, integral_z = 0.0f;
+    int64_t last_attitude_us = 0;
+    bool attitude_ready = false;
+
     while (true) {
         if (!ReadMpu6050(accel, gyro)) {
             if (++read_errors % 100 == 1) {
@@ -508,6 +521,74 @@ void SensorHub::MotionTask() {
 
         for (int i = 0; i < 3; ++i) {
             gyro[i] -= gyro_bias[i];
+        }
+
+        // ---- 姿态四元数更新（50Hz） ----
+        if (!attitude_ready) {
+            float norm = sqrtf(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]);
+            if (norm > 0.1f) {
+                // 用首帧加速度直接初始化 roll/pitch，避免开机后长时间收敛
+                float roll = atan2f(accel[1], accel[2]);
+                float pitch = atan2f(-accel[0], sqrtf(accel[1] * accel[1] + accel[2] * accel[2]));
+                float cr = cosf(roll * 0.5f), sr = sinf(roll * 0.5f);
+                float cp = cosf(pitch * 0.5f), sp = sinf(pitch * 0.5f);
+                qw = cr * cp;
+                qx = sr * cp;
+                qy = cr * sp;
+                qz = -sr * sp;
+                attitude_ready = true;
+            }
+        } else {
+            int64_t now_att_us = esp_timer_get_time();
+            float dt = last_attitude_us == 0
+                           ? (kMotionPeriodMs / 1000.0f)
+                           : (float)(now_att_us - last_attitude_us) / 1000000.0f;
+            last_attitude_us = now_att_us;
+            if (dt < 0.001f) {
+                dt = 0.001f;
+            } else if (dt > 0.1f) {
+                dt = 0.1f;
+            }
+
+            float gx = gyro[0] * kDegToRad;
+            float gy = gyro[1] * kDegToRad;
+            float gz = gyro[2] * kDegToRad;
+
+            float an = sqrtf(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]);
+            if (an > 0.05f) {
+                float ax = accel[0] / an, ay = accel[1] / an, az = accel[2] / an;
+                // 当前四元数预测的重力方向（机体坐标系）
+                float vx = 2.0f * (qx * qz - qw * qy);
+                float vy = 2.0f * (qw * qx + qy * qz);
+                float vz = qw * qw - qx * qx - qy * qy + qz * qz;
+                // 测量重力与预测重力的叉积误差
+                float ex = ay * vz - az * vy;
+                float ey = az * vx - ax * vz;
+                float ez = ax * vy - ay * vx;
+                integral_x += kMahonyKi * ex * dt;
+                integral_y += kMahonyKi * ey * dt;
+                integral_z += kMahonyKi * ez * dt;
+                gx += kMahonyKp * ex + integral_x;
+                gy += kMahonyKp * ey + integral_y;
+                gz += kMahonyKp * ez + integral_z;
+            }
+
+            // q' = 0.5 * q ⊗ (0, g)
+            float hw = 0.5f * (-qx * gx - qy * gy - qz * gz) * dt;
+            float hx = 0.5f * (qw * gx + qy * gz - qz * gy) * dt;
+            float hy = 0.5f * (qw * gy - qx * gz + qz * gx) * dt;
+            float hz = 0.5f * (qw * gz + qx * gy - qy * gx) * dt;
+            qw += hw;
+            qx += hx;
+            qy += hy;
+            qz += hz;
+            float qn = sqrtf(qw * qw + qx * qx + qy * qy + qz * qz);
+            if (qn > 1e-6f) {
+                qw /= qn;
+                qx /= qn;
+                qy /= qn;
+                qz /= qn;
+            }
         }
 
         if (!gravity_ready) {
@@ -639,6 +720,11 @@ void SensorHub::MotionTask() {
             motion_.gyro_dps[0] = gyro[0];
             motion_.gyro_dps[1] = gyro[1];
             motion_.gyro_dps[2] = gyro[2];
+            motion_.attitude_valid = attitude_ready;
+            motion_.quat_wxyz[0] = qw;
+            motion_.quat_wxyz[1] = qx;
+            motion_.quat_wxyz[2] = qy;
+            motion_.quat_wxyz[3] = qz;
             motion_.dynamic_g = dynamic_envelope;
             motion_.state = state;
             motion_.orientation = orientation;

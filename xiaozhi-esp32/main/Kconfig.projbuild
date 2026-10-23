@@ -753,6 +753,15 @@ config GOOUUU_GPS_ENABLE
         Enable the ATGM336H GPS receiver. GPIO43/44 are the default UART0 console
         pins, so this option must be combined with a USB-Serial-JTAG console.
 
+config APP_DEMO_MODE
+    bool "Build as App Demo firmware (BLE + route + sensors only)"
+    depends on BOARD_TYPE_GOOUUU_S3_DUAL
+    default n
+    help
+        Replace the xiaozhi voice application with the V2 App integration demo:
+        BLE command/status channel, explicit Wi-Fi/4G route selection and
+        periodic sensor reporting. Audio, cloud protocol and OTA are not started.
+
 choice DISPLAY_ESP32S3_KORVO2_V3
     depends on BOARD_TYPE_ESP32_S3_KORVO_2_V3 || BOARD_TYPE_ESP32_S3_KORVO_2_V3_RNDIS
     prompt "ESP32S3_KORVO2_V3 LCD Type"

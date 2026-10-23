@@ -876,6 +876,18 @@ file(GLOB BOARD_SOURCES
 )
 list(APPEND SOURCES ${BOARD_SOURCES})
 
+# App 对接 Demo 固件（CONFIG_APP_DEMO_MODE）：BLE 管理 + 选路 + 传感器上报
+if(CONFIG_APP_DEMO_MODE)
+    list(APPEND SOURCES
+        "app_demo/app_demo.cc"
+        "app_demo/app_ble_manager.cc"
+        "app_demo/app_network_manager.cc"
+        "app_demo/app_sensor_reporter.cc"
+        "app_demo/app_device_status.cc"
+    )
+    list(APPEND INCLUDE_DIRS "app_demo" "boards/${BOARD_DIR}")
+endif()
+
 # Select one audio engine for each chip family
 if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4 OR CONFIG_IDF_TARGET_ESP32S31)
     list(APPEND SOURCES "audio/engines/afe_audio_engine.cc")
