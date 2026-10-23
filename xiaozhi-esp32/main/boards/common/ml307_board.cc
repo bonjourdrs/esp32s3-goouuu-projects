@@ -126,7 +126,10 @@ void Ml307Board::NetworkTask() {
         if (result == NetworkStatus::Ready) {
             break;
         } else if (result == NetworkStatus::ErrorInsertPin) {
+            // 无 SIM 卡不是瞬态问题，重试也不会变好：直接上报终态并结束，
+            // 让上层立刻降级，避免反复提示并空等一分钟
             OnNetworkEvent(NetworkEvent::ModemErrorNoSim);
+            return;
         } else if (result == NetworkStatus::ErrorRegistrationDenied) {
             OnNetworkEvent(NetworkEvent::ModemErrorRegDenied);
         } else if (result == NetworkStatus::ErrorTimeout) {

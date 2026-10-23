@@ -14,6 +14,10 @@ static const char *TAG = "DualNetworkBoard";
 
 // WiFi 连接尝试时长：超时后自动切到 4G
 static constexpr int WIFI_FALLBACK_TIMEOUT_SEC = 20;
+// 无 SIM 卡属于确定性问题，重试不会变好，给很短的窗口就回退到 WiFi
+static constexpr int CELLULAR_NOSIM_RECOVERY_SEC = 5;
+// 有卡但注册不上（弱信号、临时拒绝）才给较长的恢复窗口
+static constexpr int CELLULAR_RECOVERY_SEC = 60;
 
 DualNetworkBoard::DualNetworkBoard(gpio_num_t ml307_tx_pin, gpio_num_t ml307_rx_pin, gpio_num_t ml307_dtr_pin, int32_t default_net_type, int ml307_baud_rate) 
     : Board(), 
@@ -30,6 +34,16 @@ DualNetworkBoard::DualNetworkBoard(gpio_num_t ml307_tx_pin, gpio_num_t ml307_rx_
         .skip_unhandled_events = true,
     };
     esp_timer_create(&timer_args, &wifi_fallback_timer_);
+
+    // 4G 失败/掉线后的统一恢复定时器：到点仍未联网就走兜底
+    esp_timer_create_args_t recovery_args = {
+        .callback = OnCellularRecoveryTimeout,
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "cell_recover",
+        .skip_unhandled_events = true,
+    };
+    esp_timer_create(&recovery_args, &cellular_recovery_timer_);
 
     // 从Settings加载网络模式
     mode_ = LoadNetworkModeFromSettings(default_net_type);
@@ -99,6 +113,14 @@ void DualNetworkBoard::ForwardNetworkEvent(NetworkEvent event, const std::string
         if (cellular_recovery_timer_ != nullptr) {
             esp_timer_stop(cellular_recovery_timer_);
         }
+        if (network_type_ == NetworkType::ML307) {
+            // 重新武装兜底，4G 之后再掉线还能再触发一次
+            cellular_recovery_scheduled_ = false;
+            // 4G 已可用也开放配网热点，手机连上就能改 WiFi，改完重启优先走 WiFi
+            if (mode_ == NetworkMode::AUTO && !provisioning_ap_started_) {
+                Application::GetInstance().Schedule([this]() { StartProvisioningAp(true); });
+            }
+        }
     } else if (event == NetworkEvent::WifiConfigModeEnter) {
         // 用户正在配网，绝不能在这里切 4G，否则会把配网流程拆掉并卡死状态机
         if (wifi_fallback_timer_ != nullptr) {
@@ -110,41 +132,40 @@ void DualNetworkBoard::ForwardNetworkEvent(NetworkEvent event, const std::string
         wifi_was_connected_ = false;
         esp_timer_stop(wifi_fallback_timer_);
         esp_timer_start_once(wifi_fallback_timer_, 30 * 1000000ULL);
+    } else if (event == NetworkEvent::Disconnected && mode_ == NetworkMode::AUTO &&
+               network_type_ == NetworkType::ML307) {
+        // 4G 运行中断线（含模组重启超时）：给恢复窗口，仍连不上就开放配网热点，
+        // 否则设备会静默地停在无网状态，唤醒词也不会有任何反应
+        ESP_LOGW(TAG, "Cellular disconnected, waiting %ds for recovery", CELLULAR_RECOVERY_SEC);
+        if (cellular_recovery_timer_ != nullptr) {
+            esp_timer_stop(cellular_recovery_timer_);
+            esp_timer_start_once(cellular_recovery_timer_, CELLULAR_RECOVERY_SEC * 1000000ULL);
+        }
     } else if (network_type_ == NetworkType::ML307 &&
                (event == NetworkEvent::ModemErrorInitFailed || event == NetworkEvent::ModemErrorNoSim ||
                 event == NetworkEvent::ModemErrorRegDenied ||
                 event == NetworkEvent::ModemErrorRegistrationExhausted) &&
                !cellular_recovery_scheduled_) {
         cellular_recovery_scheduled_ = true;
+        bool no_sim = (event == NetworkEvent::ModemErrorNoSim);
         if (mode_ == NetworkMode::AUTO) {
-            // 自动模式下 4G 起不来（没插卡/模组异常）：重启回 WiFi 优先，
-            // 否则设备会一直停在启动态，屏幕卡在“检测模组”，唤醒词也不会工作。
-            ESP_LOGW(TAG, "Cellular unavailable in auto mode, rebooting to retry WiFi");
-            Application::GetInstance().Schedule([this]() {
-                if (auto display = GetDisplay()) {
-                    display->ShowNotification("4G 不可用，重启后优先连接 WiFi", 3000);
-                }
-                vTaskDelay(pdMS_TO_TICKS(1500));
-                Application::GetInstance().Reboot();
-            });
+            // 自动模式下 4G 也起不来：不再重启，直接开放配网热点，
+            // 让用户用手机补 WiFi 密码，避免设备失联
+            ESP_LOGW(TAG, "Cellular unavailable in auto mode, opening provisioning AP");
+            Application::GetInstance().Schedule([this]() { StartProvisioningAp(false); });
         } else {
-            // 仅 4G 模式：给 60 秒自行恢复的机会，仍连不上就切回 WiFi 并进入配网，
+            // 仅 4G 模式：给一段自行恢复的机会，仍连不上就切回 WiFi 并进入配网，
             // 避免设备彻底失联（长按 BOOT 也能手动切回）
-            ESP_LOGW(TAG, "Cellular unavailable, will fall back to WiFi in 60s");
+            int recovery_sec = no_sim ? CELLULAR_NOSIM_RECOVERY_SEC : CELLULAR_RECOVERY_SEC;
+            ESP_LOGW(TAG, "Cellular unavailable, will fall back to WiFi in %ds", recovery_sec);
             if (auto display = GetDisplay()) {
-                display->ShowNotification("4G 不可用，60 秒后自动切回 WiFi 配网", 5000);
+                display->ShowNotification(no_sim ? "未检测到 SIM 卡，稍后切回 WiFi"
+                                                 : "4G 不可用，稍后自动切回 WiFi 配网",
+                                          no_sim ? 3000 : 5000);
             }
-            if (cellular_recovery_timer_ == nullptr) {
-                esp_timer_create_args_t timer_args = {
-                    .callback = OnCellularRecoveryTimeout,
-                    .arg = this,
-                    .dispatch_method = ESP_TIMER_TASK,
-                    .name = "cell_recover",
-                    .skip_unhandled_events = true,
-                };
-                esp_timer_create(&timer_args, &cellular_recovery_timer_);
+            if (cellular_recovery_timer_ != nullptr) {
+                esp_timer_start_once(cellular_recovery_timer_, recovery_sec * 1000000ULL);
             }
-            esp_timer_start_once(cellular_recovery_timer_, 60 * 1000000ULL);
         }
     }
     if (network_event_callback_) {
@@ -174,10 +195,67 @@ void DualNetworkBoard::OnCellularRecoveryTimeout(void* arg) {
     if (board->network_type_ != NetworkType::ML307 || board->IsNetworkConnected()) {
         return;
     }
-    ESP_LOGW(TAG, "Cellular still unavailable, switch to WiFi config mode");
+    ESP_LOGW(TAG, "Cellular still unavailable, opening provisioning AP");
+    if (board->mode_ == NetworkMode::AUTO) {
+        // 自动模式：不再重启（重启只会再走一遍同样的失败流程），
+        // 直接开放配网热点让用户补 WiFi
+        Application::GetInstance().Schedule([board]() { board->StartProvisioningAp(false); });
+        return;
+    }
+    // 仅 4G 模式：切回 WiFi 并重启，避免设备彻底失联
     board->SetNetworkMode(NetworkMode::WIFI_ONLY);
     // 定时器回调里不能直接重启，交给主任务
     Application::GetInstance().Schedule([]() { Application::GetInstance().Reboot(); });
+}
+
+void DualNetworkBoard::StartProvisioningAp(bool network_ready) {
+    if (provisioning_ap_started_.exchange(true)) {
+        return;
+    }
+
+    auto& wifi = WifiManager::GetInstance();
+    if (!wifi.IsInitialized()) {
+        ESP_LOGW(TAG, "WiFi manager not initialized, initializing before config AP");
+        wifi.Initialize(WifiManagerConfig{});
+    }
+
+    // 网页提交新 WiFi 后会走 ConfigModeExit，重启一次让新 SSID 在下次开机生效
+    wifi.SetEventCallback([](WifiEvent event, const std::string&) {
+        if (event != WifiEvent::ConfigModeExit) {
+            return;
+        }
+        ESP_LOGI(TAG, "WiFi credentials submitted, rebooting to apply");
+        Application::GetInstance().Schedule([]() {
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            Application::GetInstance().Reboot();
+        });
+    });
+
+    wifi.StartConfigAp();
+
+    std::string hint = Lang::Strings::CONNECT_TO_HOTSPOT;
+    hint += wifi.GetApSsid();
+    hint += Lang::Strings::ACCESS_VIA_BROWSER;
+    hint += wifi.GetApWebUrl();
+
+    if (network_ready) {
+        // 4G 可用：保持当前设备状态，只提示热点已开放
+        ESP_LOGI(TAG, "Provisioning AP %s is online while cellular is active",
+                 wifi.GetApSsid().c_str());
+        if (auto display = GetDisplay()) {
+            display->ShowNotification(hint.c_str(), 8000);
+        }
+    } else {
+        // 4G 也不可用：进入配网状态。用状态栏+通知而不是弹窗告警，
+        // 这样 4G 万一自行恢复时界面不会卡在一个必须手动关闭的对话框上
+        ESP_LOGW(TAG, "No network available, entering WiFi provisioning: %s %s %s",
+                 wifi.GetApSsid().c_str(), wifi.GetApWebUrl().c_str(), hint.c_str());
+        Application::GetInstance().SetDeviceState(kDeviceStateWifiConfiguring);
+        if (auto display = GetDisplay()) {
+            display->SetStatus(Lang::Strings::WIFI_CONFIG_MODE);
+            display->ShowNotification(hint.c_str(), 30000);
+        }
+    }
 }
 
 void DualNetworkBoard::StartCellular() {
