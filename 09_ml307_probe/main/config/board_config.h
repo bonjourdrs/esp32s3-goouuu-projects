@@ -19,5 +19,6 @@
  * component would otherwise retry forever (timeout -1). */
 #define ML307_DETECT_TIMEOUT_MS 6000
 
-/* Attach is expected to fail with ErrorInsertPin while no SIM is fitted. */
-#define ML307_ATTACH_TIMEOUT_MS 10000
+/* First attach after boot can take 15-30 s on a live network, so give it 60 s.
+ * Without a SIM it still returns ErrorInsertPin almost immediately. */
+#define ML307_ATTACH_TIMEOUT_MS 60000

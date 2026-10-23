@@ -1,8 +1,8 @@
 # 09 · ML307R 4G 模组探测
 
-验证底板上的 ML307R（Cat.1 4G 模组）能不能被识别和初始化。**这个工程不需要 SIM 卡**——
-AT 通道通不通，靠模组的型号、IMEI 和 AT 错误码就能确认；没有卡只会让"入网"这一步失败，
-而那正好是预期结果。
+验证底板上的 ML307R（Cat.1 4G 模组）能不能被识别、初始化，以及插卡后能不能真正上网。
+不插卡也能跑：AT 通道通不通，靠模组的型号、IMEI 和 AT 错误码就能确认；没有卡只会让"入网"这一步失败。
+插卡后会继续做注册检查和一次真实 HTTP 请求。
 
 ## 硬件
 
@@ -57,7 +57,11 @@ ML307A / ML307R / EC801E / NT26K，自动识别型号。它要求 **C++23**（�
    ↓
 逐条查询 CPIN? / MCCID / CSQ / CEREG? / COPS?
    ↓
-WaitForNetworkReady(10 s)
+WaitForNetworkReady(60 s)
+   ↓ ready
+打印运营商 / 注册状态 / CSQ / ICCID（脱敏）
+   ↓
+HTTP GET http://www.baidu.com/  →  打印状态码、响应字节数、首行
 ```
 
 超时必须给一个有限值。组件的 `DetectBaudRate` 里是 `while (true)`，超时参数为 `-1`
@@ -123,8 +127,34 @@ I (23001) ML307: alive  pin_ready=0  network_ready=0  CSQ=99
 
 首次编译要下载组件，比其它工程慢；之后走缓存。
 
-## 插卡之后
+## 实测结果（2026-10-22，插入中国电信 SIM）
 
-装好 SIM 卡再跑一次，`WaitForNetworkReady` 应该返回 `ready`，`AT+CSQ` 会给出
-实际的信号质量（0–31，越大越好），`AT+COPS?` 能读到运营商名。到那一步就可以接
-`CreateHttp()` / `CreateMqtt()` 做真正的联网测试了。
+```
+I (912) ML307: network attach  : ready
+I (912) ML307: carrier         : CHN-CT
+I (912) ML307: registration    : {"stat":1,"tac":"5D5A","ci":"0B2906BF","AcT":7}
+I (922) ML307: CSQ             : 18
+I (932) ML307: ICCID           : ****6996
+I (942) ML307: HTTP GET        : http://www.baidu.com/
+I (1512) Ml307Http: HTTP request successful, status code: 200
+I (4622) ML307: HTTP body bytes : 17143
+I (4642) Ml307Http: HTTP connection closed, ID: 0
+```
+
+结论：
+
+- **模组不是移动锁卡版**。插入电信卡后能正常注册（`CHN-CT`），说明三网通用。
+- PDP 上下文拿到运营商内网地址（`10.94.240.182`），HTTP 请求 1.5 秒返回 200，读回 17 KB 页面，是真正走通了数据链路，不只是"注册上"。
+- 首次入网后约 40 秒内出现过一次 `network_ready=0` 和 `AT+CSQ` 超时，属于开机注册阶段的抖动；之后连续观察 2 分钟保持 `network_ready=1`、`CSQ=20`，稳定。
+- 对外只打印 ICCID/IMEI 后 4 位。
+
+如果换联通/电信卡后卡在 `network attach`，先看 `AT+CPIN?`：
+
+| 现象 | 含义 |
+|---|---|
+| `CPIN` 正常但一直不注册 | 可能是运营商定制/锁卡版，或该频段覆盖差 |
+| 注册成功但没有 HTTP | APN 未自动下发，需要用 `AT+CGDCONT` 手工配置 |
+| 手机卡被断网 | 运营商可能限制手机卡用于 Cat.1 模组，建议换物联网卡 |
+
+组件本身不设置 APN，依赖模组按 SIM 自动选择。需要手工 APN 时，在 `WaitForNetworkReady` 之前发
+`AT+CGDCONT=1,"IP","<apn>"`，联通 `3gnet`/`wonet`，电信 `ctnet`，移动 `cmnet`。
