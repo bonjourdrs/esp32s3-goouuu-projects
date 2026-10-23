@@ -61,6 +61,8 @@
 
 也可以走 ESP32-S3 自带的 WiFi 和蓝牙，做音频流上传、手机端远程控制灯的亮度、或者接云端做语音识别。WiFi 协议栈加配网流程会让工程复杂度明显上升，建议同样单独立一个工程验证连通性，再考虑和现有音频工程合并。
 
+**BLE 通路已验证 → [`10_ble_demo`](../10_ble_demo)。** NimBLE GATT 外设 + Android 实测 7 项全过（扫描、连接、MTU 247、写 RX、Notify TX、断开重连、数据完整性）。应用侧已落地为 `xiaozhi-esp32` 的 `goouuu-s3-dual-app-demo` 变体：BLE 管理设备、Wi-Fi/4G 显式选路、传感器与 10 Hz 四元数姿态上报，协议见 [13-ble-v2-protocol.md](13-ble-v2-protocol.md)。下一步可以在 BLE 上补 OTA、配网或自定义属性。
+
 ## 语音唤醒
 
 **已在 [`xiaozhi-esp32`](../xiaozhi-esp32) 中实现。** 应用使用乐鑫 esp-sr 的 `wn9_nihaoxiaozhi_tts` 唤醒词模型，配合麦克风做本地唤醒，8 MB PSRAM 承担模型内存。

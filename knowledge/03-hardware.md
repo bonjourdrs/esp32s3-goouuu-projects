@@ -6,7 +6,7 @@
 
 底板是双排 2×21P 母座，插一块 42Pin 的 ESP32-S3-DevKitC-1 核心板。核心板模组是 ESP32-S3-WROOM-1 N16R8，16 MB Flash 加 8 MB Octal PSRAM，实测芯片为 ESP32-S3 双核、silicon rev v0.2。
 
-底板上的模块分三类：基础外设（WS2812、MAX98357、INMP441）、传感器与屏幕（AHT20、BMP280、MPU6050、ST7789）、网络（WiFi、ML307R、GPS）。01–09 逐个验证这些通路，`xiaozhi-esp32` 负责整机集成。
+底板上的模块分三类：基础外设（WS2812、MAX98357、INMP441）、传感器与屏幕（AHT20、BMP280、MPU6050、ST7789）、网络（WiFi、ML307R、GPS、BLE）。01–09 逐个验证外设通路，10 验证 BLE 链路，`xiaozhi-esp32` 负责整机集成。
 
 ## 模块覆盖情况
 
