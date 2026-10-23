@@ -16,6 +16,9 @@ struct EnvironmentReading {
     float temperature_c = 0.0f;
     float humidity_pct = 0.0f;
     float pressure_hpa = 0.0f;
+    // BMP280 自带温度通道（用于气压补偿与 App baro.chip_temp）
+    bool bmp_temperature_valid = false;
+    float bmp_temperature_c = 0.0f;
     // 最近 1 小时气压变化量（hPa），必须攒满 1 小时样本才置为有效
     bool pressure_trend_valid = false;
     float pressure_trend_1h_hpa = 0.0f;
@@ -30,6 +33,9 @@ struct MotionReading {
     float accel_g[3] = {0.0f, 0.0f, 0.0f};
     float gyro_dps[3] = {0.0f, 0.0f, 0.0f};
     float dynamic_g = 0.0f;      // 去掉重力后的动态加速度幅值
+    // 姿态四元数（Mahony 互补滤波，加速度计校正，无磁力计 → yaw 会漂移）
+    bool attitude_valid = false;
+    float quat_wxyz[4] = {1.0f, 0.0f, 0.0f, 0.0f};
     std::string state = "unknown";        // still / walking / shaking / impact
     std::string orientation = "unknown";  // face_up / face_down / upright / upside_down / landscape_* / tilted
     float moving_duration_s = 0.0f;

@@ -16,6 +16,25 @@
                 "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
                 "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y"
             ]
+        },
+        {
+            "name": "goouuu-s3-dual-app-demo",
+            "sdkconfig_append": [
+                "CONFIG_LCD_ST7789_240X240=y",
+                "CONFIG_GOOUUU_GPS_ENABLE=y",
+                "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
+                "CONFIG_APP_DEMO_MODE=y",
+                "CONFIG_BT_ENABLED=y",
+                "CONFIG_BT_NIMBLE_ENABLED=y",
+                "CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y",
+                "CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y",
+                "CONFIG_BT_NIMBLE_ROLE_OBSERVER=n",
+                "CONFIG_BT_NIMBLE_ROLE_CENTRAL=n",
+                "CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247",
+                "CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1",
+                "CONFIG_BT_CLASSIC_ENABLED=n"
+            ]
         }
     ]
 }
