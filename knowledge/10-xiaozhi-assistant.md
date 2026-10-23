@@ -8,11 +8,12 @@
 | 文件 | 作用 |
 |---|---|
 | `main/boards/goouuu-s3-dual/config.h` | 引脚定义，与底板原理图一致 |
-| `main/boards/goouuu-s3-dual/config.json` | 两个构建变体：默认、`goouuu-s3-dual-gps` |
+| `main/boards/goouuu-s3-dual/config.json` | 三个构建变体：默认、`goouuu-s3-dual-gps`、`goouuu-s3-dual-app-demo` |
 | `main/boards/goouuu-s3-dual/goouuu_s3_dual.cc` | 板级主类：网络、按键、手势、摇一摇、MCP 工具、状态条 |
-| `main/boards/goouuu-s3-dual/sensor_hub.cc/.h` | AHT20 / BMP280 / MPU6050 统一入口，含摇一摇判定与气压趋势 |
+| `main/boards/goouuu-s3-dual/sensor_hub.cc/.h` | AHT20 / BMP280 / MPU6050 统一入口，含 50 Hz 采样、Mahony 四元数与摇一摇判定 |
 | `main/boards/goouuu-s3-dual/gps_receiver.cc/.h` | ATGM336H NMEA 解析与离线城市匹配 |
-| `main/boards/common/dual_network_board.cc/.h` | WiFi 优先、4G 自动兜底的状态机 |
+| `main/boards/common/dual_network_board.cc/.h` | WiFi 优先、4G 自动兜底的状态机（App Demo 变体不启用） |
+| `main/app_demo/` | App 对接 Demo：BLE V2 服务、显式选路状态机、传感器上报 |
 
 ## 构建与烧录
 
@@ -20,6 +21,7 @@
 cd xiaozhi-esp32
 python scripts/build.py goouuu-s3-dual                        # 默认：UART0 控制台，GPS 关闭
 python scripts/build.py goouuu-s3-dual --name goouuu-s3-dual-gps  # GPS 开启，控制台改 USB-Serial-JTAG
+python scripts/build.py goouuu-s3-dual --name goouuu-s3-dual-app-demo  # Android App 对接 Demo
 idf.py -p COM4 flash monitor
 ```
 
@@ -83,6 +85,17 @@ idf.py -p COM4 flash monitor
 ```
 
 `SetInfoText` 只继承父对象样式，不设置局部字体指针，避免激活阶段资源重建后字体悬空导致 `InstrFetchProhibited`。
+
+## App 对接 Demo（BLE V2）
+
+`goouuu-s3-dual-app-demo` 变体面向 Android App，不走语音对话：
+
+- BLE 与 Internet 完全解耦，断网也能连上设备、切选路、看状态。
+- 只暴露 `wifi` / `4g` 两条链路，`selected_route` 存 NVS，失败不回滚，**不使用 AUTO/fallback**。
+- `set_route` 必须依次回 `ACK → route(initializing) → … → route(ready|failed)`。
+- 传感器周期上报：env/baro 2 s、IMU 10 Hz、GPS 1 s、device 5 s、wifi 2 s、cell 3 s；
+  IMU 用 Mahony 互补滤波输出四元数，BLE 只保留最新一帧，避免 App 卡顿。
+- 字段、枚举、错误码见 [13-ble-v2-protocol.md](13-ble-v2-protocol.md)。
 
 ## 已知问题与限制
 

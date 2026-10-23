@@ -7,8 +7,26 @@ MPU6050 与可选 ATGM336H GPS，240×240 ST7789 屏幕。
 
 ```bash
 python scripts/build.py goouuu-s3-dual                       # 默认固件（UART0 控制台，GPS 关闭）
-python scripts/build.py goouuu-s3-dual --name goouuu-s3-dual-gps   # 启用 GPS（控制台改为 USB-Serial-JTAG）
+python scripts/build.py goouuu-s3-dual --name goouuu-s3-dual-gps       # 启用 GPS（控制台改为 USB-Serial-JTAG）
+python scripts/build.py goouuu-s3-dual --name goouuu-s3-dual-app-demo  # Android App 对接 Demo
 ```
+
+## App 对接 Demo 变体
+
+`goouuu-s3-dual-app-demo` 通过 `CONFIG_APP_DEMO_MODE` 走独立入口，只跑
+「BLE + Wi-Fi/4G 显式选路 + 传感器上报」，不初始化音频、屏幕 UI 与云端连接，
+供 Android V2.x 直接管理设备。
+
+- 设备名 `ESP32S3-AI-ASSISTANT`，Service `8f1d0001-…`，RX `8f1d0002-…`，TX `8f1d0003-…`，MTU 247。
+- 命令：`get_capabilities` / `get_status` / `set_route` / `reinit_route`。
+- `selected_route` 独立存 NVS（`app_demo/route`，1=wifi，2=4g），只由 App 命令或启动恢复修改；
+  网络成功/失败都不改它，也**不走 AUTO 自动兜底**。
+- 周期上报：env/baro 2 s、imu 10 Hz、gps 1 s、device 5 s、wifi 2 s、cell 3 s，状态变化立即补发。
+- IMU 用 Mahony 互补滤波输出四元数，BLE 只发最新一帧，拥塞时丢旧帧。
+- GPS 占用 UART2（GPIO43/44，9600），控制台固定 USB-Serial-JTAG。
+
+完整字段、枚举与消息时序见
+[knowledge/13-ble-v2-protocol.md](../../../../knowledge/13-ble-v2-protocol.md)。
 
 ## 网络模式
 
