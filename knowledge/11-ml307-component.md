@@ -1,7 +1,7 @@
 # esp-ml307 组件与本地源码
 
 `esp-ml307-src/` 是 [`78/esp-ml307`](https://github.com/78/esp-ml307) 3.8.1 的本地源码副本，
-用来阅读 AT 通道实现、对照日志和做临时实验。它是独立 Git 仓库，父仓库通过 `.gitignore` 排除。
+用来阅读 AT 通道实现、对照日志和做临时实验。它作为普通目录纳入本仓库版本管理，`.git` 已移除。
 
 ## 组件身份
 
@@ -60,6 +60,32 @@ esp-ml307-src/
 | SIM | 手机 Nano SIM，插入后可用 |
 
 串口按**模组侧**命名：底板 `G12_RXD` 是模组 RX、`G11_TXD` 是模组 TX，所以 ESP 侧必须 **TX=12、RX=11**，接反一个字节都收不到。
+
+## 模组热重启（+MATREADY）与恢复去抖
+
+`+MATREADY` 是模组开机初始化完成的 URC。运行中再次出现，说明模组内部重启（实测多为
+Cat.1 峰值电流 2A 引起的供电瞬跌），PDP 会短暂失效，30–60 秒后自行恢复。
+
+组件把它当作断网处理：
+
+```cpp
+} else if (command == "MATREADY") {
+    if (network_ready_) {
+        network_ready_ = false;
+        if (on_network_state_changed_) on_network_state_changed_(false);
+    }
+}
+```
+
+这在原生 xiaozhi 里会立刻触发 `NetworkEvent::Disconnected`，导致界面跳回联网页、
+AUTO 模式误切 WiFi。因此 `Ml307Board` 在回调上加了一层恢复窗口（`ml307_board.cc`）：
+
+- 收到断网回调先不向上报，置 `recovery_pending_`，启动 5 秒轮询、60 秒截止的 `esp_timer`；
+- 期间模组重新驻网（`network_ready_` 变 true）就停表并发 `Connected`，界面无感；
+- 超过 60 秒仍未恢复才发 `Disconnected`，交给 `DualNetworkBoard` 的降级逻辑处理。
+
+注意 `network_ready_` 只有 `+CEREG`（stat 1/5）和 `+MIPCALL` 会置 true，`MIPCALL` 不触发
+回调，所以轮询里需要自己查 `modem_->network_ready()`。
 
 ## 调试要点
 

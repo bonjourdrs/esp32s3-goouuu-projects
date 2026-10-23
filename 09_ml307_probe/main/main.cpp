@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -50,6 +51,45 @@ static const PinOrder kOrders[] = {
     { PIN_ML307_RX, PIN_ML307_TX, "swapped    TX=GPIO11 RX=GPIO12" },
 };
 
+/* Only the last 4 digits are logged; ICCID/IMEI are subscriber identifiers. */
+static std::string tail4(const std::string &value)
+{
+    if (value.size() <= 4) {
+        return value;
+    }
+    return "****" + value.substr(value.size() - 4);
+}
+
+/* A real end-to-end check: if this returns 200/30x the PDP context is up and
+ * the module can actually move data, not just register on the network. */
+static void test_http(AtModem &modem)
+{
+    auto http = modem.CreateHttp();
+    http->SetTimeout(20000);
+    http->SetHeader("User-Agent", "ml307-probe");
+
+    const char *url = "http://www.baidu.com/";
+    ESP_LOGI(TAG, "HTTP GET        : %s", url);
+    if (auto opened = http->Open("GET", url); !opened) {
+        ESP_LOGE(TAG, "HTTP open       : FAIL %s", opened.error().ToString().c_str());
+        return;
+    }
+
+    if (auto code = http->GetStatusCode(); code) {
+        ESP_LOGI(TAG, "HTTP status     : %d", *code);
+    } else {
+        ESP_LOGE(TAG, "HTTP status     : FAIL %s", code.error().ToString().c_str());
+    }
+
+    std::string body = http->ReadAll();
+    ESP_LOGI(TAG, "HTTP body bytes : %d", static_cast<int>(body.size()));
+    if (!body.empty()) {
+        std::string head = body.substr(0, std::min<size_t>(body.size(), 120));
+        ESP_LOGI(TAG, "HTTP head       : %s", head.c_str());
+    }
+    http->Close();
+}
+
 extern "C" void app_main(void)
 {
     std::unique_ptr<AtModem> modem;
@@ -74,9 +114,13 @@ extern "C" void app_main(void)
 
     auto uart = modem->GetAtUart();
 
+    /* Dump every AT line the module sends. Needed to tell a module reboot
+     * (+MATREADY / RDY) apart from a network-side detach (+CEREG: 0). */
+    uart->SetDebug(true);
+
     ESP_LOGI(TAG, "module revision : %s", modem->GetModuleRevision().c_str());
     ESP_LOGI(TAG, "active baud rate: %d", uart->GetBaudRate());
-    ESP_LOGI(TAG, "IMEI            : %s", modem->GetImei().c_str());
+    ESP_LOGI(TAG, "IMEI            : %s", tail4(modem->GetImei()).c_str());
 
     query(uart, "AT+CPIN?");
     query(uart, "AT+MCCID");
@@ -85,8 +129,17 @@ extern "C" void app_main(void)
     query(uart, "AT+COPS?");
 
     NetworkStatus status = modem->WaitForNetworkReady(ML307_ATTACH_TIMEOUT_MS);
-    ESP_LOGW(TAG, "network attach  : %s (expected to fail with no SIM)",
-             network_status_name(status));
+    if (status == NetworkStatus::Ready) {
+        ESP_LOGI(TAG, "network attach  : ready");
+        ESP_LOGI(TAG, "carrier         : %s", modem->GetCarrierName().c_str());
+        ESP_LOGI(TAG, "registration    : %s", modem->GetRegistrationState().ToString().c_str());
+        ESP_LOGI(TAG, "CSQ             : %d", modem->GetCsq());
+        ESP_LOGI(TAG, "ICCID           : %s", tail4(modem->GetIccid()).c_str());
+        test_http(*modem);
+    } else {
+        ESP_LOGE(TAG, "network attach  : %s", network_status_name(status));
+        ESP_LOGE(TAG, "no data test - check SIM type / card lock / APN");
+    }
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(15000));

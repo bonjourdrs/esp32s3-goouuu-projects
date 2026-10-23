@@ -15,6 +15,10 @@ CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 
+# HTTP 测试走 AT+MHTTPCREATE/ReadAll，加上 AT 原始日志后默认 3.5 KB 的
+# main 任务栈会溢出（看门狗报 "stack overflow in task main"）。
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
 # --------------------------------------------------------------------------
 #  esp-ml307: the AT UART runs on UHCI DMA. Keeping the UART ISR in IRAM is
 #  what the component README recommends to avoid UART_FIFO_OVF under load.

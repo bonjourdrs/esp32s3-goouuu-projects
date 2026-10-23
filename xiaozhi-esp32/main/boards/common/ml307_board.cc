@@ -16,9 +16,31 @@ static const char *TAG = "Ml307Board";
 static constexpr int MODEM_DETECT_MAX_RETRIES = 30;
 // Maximum retry count for network registration
 static constexpr int NETWORK_REG_MAX_RETRIES = 6;
+// 模组自行重启（+MATREADY）后给它的恢复窗口。重启 + 重新驻网 + 重建 PDP
+// 通常 30–60 s，超过这个时间才认为真的断网
+static constexpr int MODEM_RECOVERY_GRACE_SEC = 60;
+static constexpr int MODEM_RECOVERY_POLL_MS = 5000;
 
 Ml307Board::Ml307Board(gpio_num_t tx_pin, gpio_num_t rx_pin, gpio_num_t dtr_pin, int baud_rate)
     : tx_pin_(tx_pin), rx_pin_(rx_pin), dtr_pin_(dtr_pin), baud_rate_(baud_rate) {
+    esp_timer_create_args_t timer_args = {
+        .callback = [](void* arg) {
+            static_cast<Ml307Board*>(arg)->OnRecoveryTick();
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "ml307_recover",
+        .skip_unhandled_events = true,
+    };
+    esp_timer_create(&timer_args, &recovery_timer_);
+}
+
+Ml307Board::~Ml307Board() {
+    if (recovery_timer_ != nullptr) {
+        esp_timer_stop(recovery_timer_);
+        esp_timer_delete(recovery_timer_);
+        recovery_timer_ = nullptr;
+    }
 }
 
 std::string Ml307Board::GetBoardType() {
@@ -91,11 +113,7 @@ void Ml307Board::NetworkTask() {
     // Set up network state change callback
     // Note: Don't call GetCarrierName() here as it sends AT command and will block ReceiveTask
     modem_->OnNetworkStateChanged([this](bool network_ready) {
-        if (network_ready) {
-            OnNetworkEvent(NetworkEvent::Connected);
-        } else {
-            OnNetworkEvent(NetworkEvent::Disconnected);
-        }
+        HandleModemStateChanged(network_ready);
     });
 
     // Notify network registration started
@@ -140,6 +158,65 @@ void Ml307Board::NetworkTask() {
     };
     ESP_LOGI(TAG, "ML307 IMEI: %s", mask_tail(imei).c_str());
     ESP_LOGI(TAG, "ML307 ICCID: %s", mask_tail(iccid).c_str());
+}
+
+void Ml307Board::HandleModemStateChanged(bool network_ready) {
+    if (network_ready) {
+        bool was_recovering = recovery_pending_.exchange(false);
+        if (was_recovering) {
+            if (recovery_timer_ != nullptr) {
+                esp_timer_stop(recovery_timer_);
+            }
+            ESP_LOGI(TAG, "Modem recovered without leaving network");
+        }
+        OnNetworkEvent(NetworkEvent::Connected);
+        return;
+    }
+
+    // +MATREADY 表示模组内部重启，PDP 会短暂失效。这里先不向上层报断网，
+    // 给它一个恢复窗口，避免界面闪回联网页、AUTO 模式误切 WiFi。
+    bool expected = false;
+    if (!recovery_pending_.compare_exchange_strong(expected, true)) {
+        return;  // 已经在恢复窗口里，忽略重复的断网通知
+    }
+
+    recovery_deadline_us_.store(esp_timer_get_time() + MODEM_RECOVERY_GRACE_SEC * 1000000LL);
+    ESP_LOGW(TAG, "Modem reset detected, waiting up to %d s for recovery...",
+             MODEM_RECOVERY_GRACE_SEC);
+    if (recovery_timer_ != nullptr) {
+        esp_timer_stop(recovery_timer_);
+        esp_timer_start_periodic(recovery_timer_, MODEM_RECOVERY_POLL_MS * 1000ULL);
+    }
+}
+
+void Ml307Board::OnRecoveryTick() {
+    if (!recovery_pending_.load()) {
+        if (recovery_timer_ != nullptr) {
+            esp_timer_stop(recovery_timer_);
+        }
+        return;
+    }
+
+    // 模组自己重新驻网成功（可能只发生了 MIPCALL，没有回调），直接恢复
+    if (modem_ != nullptr && modem_->network_ready()) {
+        recovery_pending_.store(false);
+        if (recovery_timer_ != nullptr) {
+            esp_timer_stop(recovery_timer_);
+        }
+        ESP_LOGI(TAG, "Modem recovered within grace period");
+        OnNetworkEvent(NetworkEvent::Connected);
+        return;
+    }
+
+    if (esp_timer_get_time() >= recovery_deadline_us_.load()) {
+        recovery_pending_.store(false);
+        if (recovery_timer_ != nullptr) {
+            esp_timer_stop(recovery_timer_);
+        }
+        ESP_LOGW(TAG, "Modem did not recover within %d s, reporting disconnect",
+                 MODEM_RECOVERY_GRACE_SEC);
+        OnNetworkEvent(NetworkEvent::Disconnected);
+    }
 }
 
 void Ml307Board::StartNetwork() {

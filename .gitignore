@@ -10,6 +10,8 @@ managed_components/
 # ---- logs / temp ----
 *.log
 *.tmp
+.pytest-tmp/
+_git_backup/
 
 # ---- editors ----
 .vscode/

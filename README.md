@@ -6,7 +6,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 - **xiaozhi-esp32**：完整的 AI 随身助手应用（小智 v2.4.2 基础上扩展）；
 - **esp-ml307-src**：`78/esp-ml307` 组件源码的本地副本，供阅读和调试。
 
-前九个工程各自独立编译、烧录、互不依赖；后两个目录各自保留独立的 Git 仓库，父仓库通过 `.gitignore` 排除，避免嵌套提交。
+前九个工程各自独立编译、烧录、互不依赖；`xiaozhi-esp32` 与 `esp-ml307-src` 以普通目录形式纳入本仓库统一版本管理，构建产物（`build/`、`managed_components/`、`sdkconfig`）由 `.gitignore` 排除。
 
 ## 工程总览
 
@@ -22,7 +22,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 | [`06_offline_pet`](06_offline_pet) | 完全离线桌面宠物：说话/拿起/敲击/猛摇/倒扣各有回应，情绪会累积 | INMP441 + MPU6050 + MAX98357 + WS2812 | WS=4 / SCK=5 / SD=6；SDA=8 / SCL=9；BCLK=15 / LRC=16 / DIN=7 |
 | [`07_env_sensor`](07_env_sensor) | 温湿度与气压读数，灯随温度变色 | AHT20 + BMP280（I2C）+ WS2812 | SDA=8 / SCL=9；GPIO48 |
 | [`08_st7789_lcd`](08_st7789_lcd) | 240×240 彩条、文字、动态方块与帧计数 | ST7789（SPI） | SCK=21 / MOSI=47 / RST=45 / DC=40 / CS=41 / BL=42 |
-| [`09_ml307_probe`](09_ml307_probe) | 识别 ML307R 4G 模组、读型号/IMEI，无 SIM 时按预期停在无卡状态 | ML307R（UART + UHCI DMA） | ESP TX=12 / ESP RX=11 |
+| [`09_ml307_probe`](09_ml307_probe) | 识别 ML307R 4G 模组、读型号/IMEI；插电信卡实测注册 `CHN-CT`、PDP `10.94.240.182`、HTTP 200 | ML307R（UART + UHCI DMA） | ESP TX=12 / ESP RX=11 |
 
 ### 应用工程
 
@@ -71,6 +71,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 | [09-roadmap.md](knowledge/09-roadmap.md) | 后续可做的扩展方向 |
 | [10-xiaozhi-assistant.md](knowledge/10-xiaozhi-assistant.md) | AI 随身助手应用：双网络、传感器工具、摇一摇、构建与已知问题 |
 | [11-ml307-component.md](knowledge/11-ml307-component.md) | esp-ml307 组件结构、AT 通道与本地副本说明 |
+| [12-code-review-backlog.md](knowledge/12-code-review-backlog.md) | 代码审查遗留项与暂缓原因 |
 
 ## 快速开始
 
@@ -97,7 +98,7 @@ python scripts/build.py goouuu-s3-dual
 idf.py -p COM4 flash monitor
 ```
 
-`xiaozhi-esp32/build` 是本地构建目录，已随搬迁清理；重新构建会自动生成。历史固件归档在
+`xiaozhi-esp32/build` 是本地构建目录（不进 git），重新构建会自动生成。历史固件归档在
 `xiaozhi-esp32/releases/goouuu-s3-dual_v2.4.2_20261021/`（含整包、分文件和烧录说明）。
 
 ## 目录结构
@@ -120,6 +121,6 @@ esp32s3-goouuu-projects\
 ├─ 07_env_sensor\
 ├─ 08_st7789_lcd\
 ├─ 09_ml307_probe\
-├─ xiaozhi-esp32\           AI 随身助手（独立 Git 仓库）
-└─ esp-ml307-src\           4G 组件源码（独立 Git 仓库）
+├─ xiaozhi-esp32\           AI 随身助手（上游 v2.4.2 克隆）
+└─ esp-ml307-src\           4G 组件源码副本（上游 esp-ml307）
 ```
