@@ -15,7 +15,7 @@ public:
     static uint32_t UptimeSeconds();
     static size_t FreeHeap();
     static size_t FreePsram();
-    static std::string BuildJson();
+    static std::string BuildJson(const char* cloud_state = "disabled");
 };
 
 }  // namespace appdemo

@@ -884,8 +884,11 @@ if(CONFIG_APP_DEMO_MODE)
         "app_demo/app_network_manager.cc"
         "app_demo/app_sensor_reporter.cc"
         "app_demo/app_device_status.cc"
+        "app_demo/app_mqtt_manager.cc"
     )
     list(APPEND INCLUDE_DIRS "app_demo" "boards/${BOARD_DIR}")
+    # EMQX Serverless CA，用于 MQTT over TLS 的证书链校验
+    list(APPEND EMBED_TXTFILES "app_demo/certs/emqxsl-ca.crt")
 endif()
 
 # Select one audio engine for each chip family
@@ -1067,9 +1070,11 @@ if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
 endif()
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
+                    EMBED_TXTFILES ${EMBED_TXTFILES}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     PRIV_REQUIRES
+                        mqtt
                         esp_pm
                         esp_psram
                         esp_netif

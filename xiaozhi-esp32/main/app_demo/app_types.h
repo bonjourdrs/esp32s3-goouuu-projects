@@ -104,6 +104,9 @@ constexpr const char* kErrInternal = "INTERNAL_ERROR";
 constexpr const char* kErrInvalidRoute = "INVALID_ROUTE";
 constexpr const char* kErrUnknownCmd = "UNKNOWN_CMD";
 constexpr const char* kErrInvalidJson = "INVALID_JSON";
+constexpr const char* kErrInvalidParam = "INVALID_PARAM";
+constexpr const char* kErrUnsupportedVersion = "UNSUPPORTED_VERSION";
+constexpr const char* kErrNvsWriteFailed = "NVS_WRITE_FAILED";
 
 }  // namespace appdemo
 

@@ -7,6 +7,7 @@
 
 #include "app_ble_manager.h"
 #include "app_device_status.h"
+#include "app_mqtt_manager.h"
 #include "app_network_manager.h"
 #include "app_sensor_reporter.h"
 #include "board.h"
@@ -34,26 +35,66 @@ void AppDemo::Start() {
     AppBleManager::GetInstance().Start(
         [this](const std::string& json) { HandleCommand(json); });
 
+    // cloud_state 变化推送给 App（type=cloud，不含密码）
+    AppMqttManager::GetInstance().SetCloudStateCallback([](const std::string& json) {
+        AppBleManager::GetInstance().Send(json);
+    });
+
     auto& network = AppNetworkManager::GetInstance();
     network.SetNotifyCallback([](const std::string& json) {
         AppBleManager::GetInstance().Send(json);
+        AppMqttManager::GetInstance().OnNetworkJson(json);
     });
     network.SetRouteChangeCallback([](SelectedRoute route) {
-        // Demo 里没有云端/WebSocket 业务连接；真实产品在这里关闭旧通路上的
-        // socket，待目标通路初始化完成后再重建，避免 selected_route 与实际
-        // 出网接口不一致。
+        // 路由切换后旧 socket 不能跨 interface 复用，交给 MqttManager 关闭并重建
         ESP_LOGW(TAG, "product internet route -> %s, close old business connections",
                  RouteToString(route));
+        AppMqttManager::GetInstance().OnRouteChanged(route);
     });
     network.Start();
 
     AppSensorReporter::GetInstance().Start();
+    AppMqttManager::GetInstance().Start();
 }
 
-void AppDemo::SendAck(int id, bool ok, const char* error) {
+namespace {
+
+// cloud_provision 参数解析：只取字段，不打印 password
+bool ParseCloudProvision(cJSON* root, CloudConfig* config, const char** error) {
+    cJSON* version = cJSON_GetObjectItemCaseSensitive(root, "version");
+    if (version != nullptr &&
+        (!cJSON_IsNumber(version) || static_cast<int>(version->valuedouble) != 1)) {
+        *error = kErrUnsupportedVersion;
+        return false;
+    }
+    cJSON* device_id = cJSON_GetObjectItemCaseSensitive(root, "device_id");
+    cJSON* host = cJSON_GetObjectItemCaseSensitive(root, "host");
+    cJSON* port = cJSON_GetObjectItemCaseSensitive(root, "port");
+    cJSON* username = cJSON_GetObjectItemCaseSensitive(root, "username");
+    cJSON* password = cJSON_GetObjectItemCaseSensitive(root, "password");
+    if (!cJSON_IsString(device_id) || !cJSON_IsString(host) || !cJSON_IsNumber(port) ||
+        !cJSON_IsString(username) || !cJSON_IsString(password)) {
+        *error = kErrInvalidParam;
+        return false;
+    }
+    config->device_id = device_id->valuestring;
+    config->host = host->valuestring;
+    config->port = static_cast<int>(port->valuedouble);
+    config->username = username->valuestring;
+    config->password = password->valuestring;
+    *error = kErrNone;
+    return true;
+}
+
+}  // namespace
+
+void AppDemo::SendAck(int id, bool ok, const char* error, const char* cmd) {
     cJSON* root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "type", "ack");
     cJSON_AddNumberToObject(root, "id", id);
+    if (cmd != nullptr) {
+        cJSON_AddStringToObject(root, "cmd", cmd);
+    }
     if (ok) {
         cJSON_AddBoolToObject(root, "ok", true);
     } else {
@@ -71,7 +112,8 @@ void AppDemo::SendAck(int id, bool ok, const char* error) {
 void AppDemo::HandleCommand(const std::string& json) {
     cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
     if (root == nullptr) {
-        ESP_LOGW(TAG, "invalid json: %s", json.c_str());
+        // 不打印原始 payload：cloud_provision 里可能含 password
+        ESP_LOGW(TAG, "invalid json len=%u", static_cast<unsigned>(json.size()));
         SendAck(0, false, kErrInvalidJson);
         return;
     }
@@ -115,6 +157,23 @@ void AppDemo::HandleCommand(const std::string& json) {
     } else if (strcmp(cmd, "reinit_route") == 0) {
         SendAck(id, true);
         AppNetworkManager::GetInstance().BeginRouteInit();
+    } else if (strcmp(cmd, "cloud_provision") == 0) {
+        CloudConfig config;
+        const char* error = kErrNone;
+        if (!ParseCloudProvision(root, &config, &error)) {
+            SendAck(id, false, error, cmd);
+        } else if (!AppMqttManager::GetInstance().ApplyCloudProvision(config, &error)) {
+            SendAck(id, false, error, cmd);
+        } else {
+            // ACK 只表示“配置已接受并写入 NVS”，连接结果由后续 type=cloud 推送
+            SendAck(id, true, nullptr, cmd);
+        }
+    } else if (strcmp(cmd, "get_cloud_status") == 0) {
+        SendAck(id, true, nullptr, cmd);
+        AppBleManager::GetInstance().Send(AppMqttManager::GetInstance().BuildCloudJson());
+    } else if (strcmp(cmd, "cloud_clear") == 0) {
+        AppMqttManager::GetInstance().ClearCloudProvision();
+        SendAck(id, true, nullptr, cmd);
     } else {
         SendAck(id, false, kErrUnknownCmd);
     }

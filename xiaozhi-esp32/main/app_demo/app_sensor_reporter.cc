@@ -7,6 +7,7 @@
 
 #include "app_ble_manager.h"
 #include "app_device_status.h"
+#include "app_mqtt_manager.h"
 #include "app_network_manager.h"
 #include "gps_receiver.h"
 #include "sensor_hub.h"
@@ -99,7 +100,8 @@ void AppSensorReporter::SendAllNow() {
     SendIfReady(BuildBaroJson());
     SendIfReady(BuildImuJson());
     SendIfReady(BuildGpsJson());
-    SendIfReady(AppDeviceStatus::BuildJson());
+    SendIfReady(AppDeviceStatus::BuildJson(
+        AppMqttManager::GetInstance().GetCloudStateString()));
 }
 
 void AppSensorReporter::SendCapabilities() {
@@ -162,7 +164,8 @@ void AppSensorReporter::Loop() {
         }
         if (now - last_device >= kDeviceIntervalMs) {
             last_device = now;
-            SendIfReady(AppDeviceStatus::BuildJson());
+            SendIfReady(AppDeviceStatus::BuildJson(
+        AppMqttManager::GetInstance().GetCloudStateString()));
         }
 
         GpsFix fix = GpsReceiver::GetInstance().GetFix();

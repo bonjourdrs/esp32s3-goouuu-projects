@@ -19,7 +19,7 @@ private:
     AppDemo& operator=(const AppDemo&) = delete;
 
     void HandleCommand(const std::string& json);
-    void SendAck(int id, bool ok, const char* error = nullptr);
+    void SendAck(int id, bool ok, const char* error = nullptr, const char* cmd = nullptr);
 };
 
 }  // namespace appdemo
