@@ -19,13 +19,14 @@ size_t AppDeviceStatus::FreePsram() {
     return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 }
 
-std::string AppDeviceStatus::BuildJson() {
+std::string AppDeviceStatus::BuildJson(const char* cloud_state) {
     cJSON* root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "type", "device");
     cJSON_AddNumberToObject(root, "uptime", UptimeSeconds());
     cJSON_AddNumberToObject(root, "heap", static_cast<double>(FreeHeap()));
     cJSON_AddNumberToObject(root, "psram", static_cast<double>(FreePsram()));
     cJSON_AddStringToObject(root, "fw", kFirmwareVersion);
+    cJSON_AddStringToObject(root, "cloud_state", cloud_state != nullptr ? cloud_state : "disabled");
     char* text = cJSON_PrintUnformatted(root);
     std::string result = text != nullptr ? text : "{}";
     if (text != nullptr) {

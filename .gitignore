@@ -13,6 +13,9 @@ managed_components/
 .pytest-tmp/
 _git_backup/
 
+# ---- secrets (never commit) ----
+mqtt_secrets.h
+
 # ---- editors ----
 .vscode/
 .idea/

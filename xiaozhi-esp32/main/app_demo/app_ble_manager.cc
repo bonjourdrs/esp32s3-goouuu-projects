@@ -383,6 +383,7 @@ void AppBleManager::OnConnected(uint16_t conn_handle) {
 }
 
 void AppBleManager::OnDisconnected(int reason) {
+    (void)reason;
     connected_ = false;
     notify_enabled_ = false;
     conn_handle_ = 0xFFFF;
