@@ -158,6 +158,7 @@
 | 07_env_sensor | AHT20 + BMP280 + WS2812 | SDA=8、SCL=9、LED=48 |
 | 08_st7789_lcd | ST7789 LCD（SPI） | SCLK=21、MOSI=47、CS=41、DC=40、RST=45、BL=42 |
 | 09_ml307_probe | ML307R | ESP TX=12、ESP RX=11 |
+| 15_usb_hid_unlock | USB-OTG HID 键盘 + WiFi SoftAP 配置页 | USB D-=19、D+=20；BOOT=GPIO0（输入，短按输入 PIN 或密码 / 长按 3 秒开热点、10 秒恢复出厂） |
 
 尚未被任何工程使用：ATGM336H GPS（G43/G44，与日志串口冲突）、音量 +/− 按键（GPIO17/GPIO39）。
-BOOT 键只用于下载。8P 母座由 08 按四线 SPI 驱动 ST7789，不是 I2C OLED。详见 [knowledge/03-hardware.md](../knowledge/03-hardware.md#模块覆盖情况)。
+BOOT 键在 01–10 只用于下载，15_usb_hid_unlock 把它作为解锁触发（注意上电瞬间按住会进下载模式）。8P 母座由 08 按四线 SPI 驱动 ST7789，不是 I2C OLED。详见 [knowledge/03-hardware.md](../knowledge/03-hardware.md#模块覆盖情况)。

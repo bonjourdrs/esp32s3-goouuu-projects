@@ -1,0 +1,59 @@
+# ==========================================================================
+#  ESP32-S3-WROOM-1 N16R8 board defaults (GOOUUU 果云版)
+#    16 MB Quad SPI flash, 8 MB Octal SPI PSRAM
+# ==========================================================================
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# --------------------------------------------------------------------------
+#  TinyUSB：只保留一个 HID 接口（键盘），不启用鼠标
+# --------------------------------------------------------------------------
+CONFIG_TINYUSB_HID_COUNT=1
+
+# --------------------------------------------------------------------------
+#  控制台必须留在 UART0
+#  ESP32-S3 的 USB-OTG 与 USB-Serial-JTAG 共用 GPIO19/20，同一时刻只能二选一。
+#  TinyUSB 占用 USB 后，日志和烧录要走核心板的 UART 口（GPIO43/44）。
+# --------------------------------------------------------------------------
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set
+# CONFIG_ESP_CONSOLE_USB_CDC is not set
+# 关掉 USB-Serial-JTAG 副控制台，否则它会在启动时初始化 USB PHY，
+# 与 TinyUSB 抢 GPIO19/20，导致 HID 无法枚举
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+# CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG is not set
+
+# --------------------------------------------------------------------------
+#  配置热点：长按 BOOT 临时开启 SoftAP + 网页服务器
+#  只有 AP 模式，不做 STA，所以不需要配 WiFi 账号。
+# --------------------------------------------------------------------------
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+# 网页 + 强制门户 DNS 同时占用的 socket 略多，留 10 个
+CONFIG_LWIP_MAX_SOCKETS=10
+
+# --------------------------------------------------------------------------
+#  蓝牙模拟键盘：BLE HID（HID over GATT），USB 没插时作为兜底通路
+#  ESP32-S3 只有 BLE，没有经典蓝牙；用 NimBLE 主机 + esp_hid 的 HID Device。
+# --------------------------------------------------------------------------
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+# HID over GATT 服务，esp_hid 的 NimBLE 后端必需
+CONFIG_BT_NIMBLE_HID_SERVICE=y
+# bond 信息（配对密钥）存 NVS，重启后不用重新配对
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# 只做外设（被电脑连接），不需要扫描别人
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+# WiFi 与蓝牙共用 2.4G 射频，需要共存调度
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y

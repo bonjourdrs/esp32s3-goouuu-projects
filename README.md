@@ -4,10 +4,11 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 
 - **01–09**：九个独立的 ESP-IDF 外设示例工程，从单外设验证逐步走到多模块联动；
 - **10_ble_demo**：BLE 双向通信最小验证工程（NimBLE GATT，Android 联调用）；
+- **15_usb_hid_unlock**：短按 BOOT，ESP32-S3 以 USB 键盘身份（拔线时自动切 BLE 蓝牙键盘）自动输入电脑 PIN 或电脑密码解锁 Windows 锁屏；长按 3 秒开配置热点，手机网页登录（出厂密码 0000，首次登录强制修改）后可设置电脑 PIN / 密码并二选一解锁；长按 10 秒恢复出厂；
 - **xiaozhi-esp32**：完整的 AI 随身助手应用（小智 v2.4.2 基础上扩展），含 App 对接 Demo 变体；
 - **esp-ml307-src**：`78/esp-ml307` 组件源码的本地副本，供阅读和调试。
 
-01–10 各自独立编译、烧录、互不依赖；`xiaozhi-esp32` 与 `esp-ml307-src` 以普通目录形式纳入本仓库统一版本管理，构建产物（`build/`、`managed_components/`、`sdkconfig`）由 `.gitignore` 排除。
+01–10 与 15 各自独立编译、烧录、互不依赖；`xiaozhi-esp32` 与 `esp-ml307-src` 以普通目录形式纳入本仓库统一版本管理，构建产物（`build/`、`managed_components/`、`sdkconfig`）由 `.gitignore` 排除。
 
 ## 工程总览
 
@@ -25,6 +26,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 | [`08_st7789_lcd`](08_st7789_lcd) | 240×240 彩条、文字、动态方块与帧计数 | ST7789（SPI） | SCK=21 / MOSI=47 / RST=45 / DC=40 / CS=41 / BL=42 |
 | [`09_ml307_probe`](09_ml307_probe) | 识别 ML307R 4G 模组、读型号/IMEI；插电信卡实测注册 `CHN-CT`、PDP `10.94.240.182`、HTTP 200 | ML307R（UART + UHCI DMA） | ESP TX=12 / ESP RX=11 |
 | [`10_ble_demo`](10_ble_demo) | BLE 双向通信最小验证：扫描/连接/MTU 247/写 RX/Notify TX/断开重连，实测 7 项全过 | NimBLE（GATT 外设） | 无外设接线，ESP32-S3 内置射频 |
+| [`15_usb_hid_unlock`](15_usb_hid_unlock) | 短按 BOOT 触发，USB HID 键盘自动输入电脑 PIN 或密码解锁 Windows 锁屏（拔线可用 BLE 蓝牙键盘兜底）；长按 3 秒开开放热点，手机网页（出厂密码 0000，首次登录强制修改）可设置电脑 PIN / 密码并二选一解锁，长按 10 秒恢复出厂 | USB-OTG（TinyUSB HID）+ BLE HID（NimBLE）+ 内置 WiFi SoftAP | USB D-=19 / D+=20；BOOT=GPIO0 |
 
 ### 应用工程
 
@@ -41,6 +43,7 @@ ESP32-S3（N16R8，16 MB Flash + 8 MB Octal PSRAM）开发板上的一套完整�
 - **01–09 是验证工程**：每个只关注一到两个外设，用来确认接线和驱动，编译产物统一放在 `D:\esp32\build\<工程名>`。
 - **10_ble_demo 是链路验证**：只验证 BLE 连接与收发，不接外设、不联网，用来隔离手机端问题。
 - **xiaozhi-esp32 是集成应用**：把屏幕、麦克风、功放、传感器、WiFi、4G 和云端对话整合在一起，在它上面继续做产品功能。
+- **15_usb_hid_unlock 是独立功能示例**：USB-OTG 做 HID 键盘（另加 BLE HID 蓝牙键盘兜底），控制台固定 UART0，另外用内置 WiFi 开了个临时配置热点（网页设置电脑 PIN / 密码），与 01–10 一样独立编译、互不影响。
 - **esp-ml307-src 是参考源码**：09 和 xiaozhi 使用的 4G 能力都来自这个组件，遇到 AT 指令问题时可以直接对照源码。
 
 新增硬件功能时，先在 01–09 里单独验证，再合入 xiaozhi，避免在完整应用里排查外设问题。
@@ -131,6 +134,7 @@ esp32s3-goouuu-projects\
 ├─ 08_st7789_lcd\
 ├─ 09_ml307_probe\
 ├─ 10_ble_demo\             BLE 双向通信验证（NimBLE）
+├─ 15_usb_hid_unlock\       BOOT 键触发 USB HID 输 PIN / 密码解锁 + 热点网页配置
 ├─ xiaozhi-esp32\           AI 随身助手（上游 v2.4.2 克隆）
 └─ esp-ml307-src\           4G 组件源码副本（上游 esp-ml307）
 ```

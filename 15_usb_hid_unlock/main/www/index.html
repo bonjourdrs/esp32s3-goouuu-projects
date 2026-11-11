@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>ESP32 解锁器配置</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#151d2f; --line:#26314a; --text:#e9eefb;
+    --sub:#8f9fbd; --accent:#3d8bfd; --accent-press:#2a6bdc;
+    --err:#ff6b6b; --ok:#45d07e; --warn:#ffb84d; --field:#0e1626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;background:var(--bg);color:var(--text);min-height:100vh;
+    display:flex;flex-direction:column;gap:18px;
+    padding:calc(env(safe-area-inset-top) + 30px) 18px calc(env(safe-area-inset-bottom) + 30px);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  header h1{margin:0 0 6px;font-size:21px;letter-spacing:.5px}
+  header p{margin:0;font-size:13px;color:var(--sub)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+  h2{margin:10px 0 6px;font-size:18px}
+  label{display:block;font-size:13px;color:var(--sub);margin-bottom:8px}
+  input{
+    width:100%;padding:15px;border-radius:12px;border:1px solid var(--line);
+    background:var(--field);color:var(--text);font-size:18px;
+    letter-spacing:2px;outline:none;transition:border-color .15s;
+  }
+  input::placeholder{color:#5b6b88;letter-spacing:0;font-size:14px}
+  input:focus{border-color:var(--accent)}
+  button{
+    width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;
+    background:var(--accent);color:#fff;font-size:16px;font-weight:600;
+    transition:background .15s,transform .1s;
+  }
+  button:active{background:var(--accent-press);transform:scale(.99)}
+  button:disabled{opacity:.55}
+  .hint{font-size:12px;color:var(--sub);line-height:1.7}
+  .msg{margin-top:12px;font-size:13px;min-height:18px;color:var(--sub)}
+  .msg.err{color:var(--err)}
+  .msg.ok{color:var(--ok)}
+  .hidden{display:none!important}
+  .badge{
+    display:inline-block;font-size:11px;padding:4px 10px;border-radius:999px;
+    border:1px solid var(--line);color:var(--sub);
+  }
+  .badge.warn{color:var(--warn);border-color:rgba(255,184,77,.45)}
+  .gap{margin-top:20px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;font-size:15px}
+  .toggle{
+    width:auto;margin:0;padding:9px 20px;font-size:14px;border-radius:999px;
+    background:var(--line);color:var(--sub);font-weight:600;
+  }
+  .toggle.on{background:var(--ok);color:#07230f}
+  .toggle:active{transform:scale(.98)}
+  .status{font-size:12px;color:var(--sub);line-height:1.8;margin-top:10px;word-break:break-all}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--err)}
+  .divider{height:1px;background:var(--line);margin:24px 0 18px}
+  footer{margin-top:auto;text-align:center;font-size:11px;color:#556382}
+
+  /* 解锁方式单选卡片 */
+  .modes{display:flex;gap:12px;margin-top:12px}
+  .mode{
+    flex:1;margin:0;padding:14px;border:1px solid var(--line);border-radius:14px;
+    background:var(--field);color:var(--text);cursor:pointer;
+    transition:border-color .15s,background .15s;
+  }
+  .mode input{display:none}
+  .mode .t{font-size:15px;font-weight:600;letter-spacing:0}
+  .mode .s{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.5;letter-spacing:0}
+  .mode.sel{border-color:var(--accent);background:rgba(61,139,253,.13)}
+  .mode.sel .t{color:var(--accent)}
+  .dot{display:inline-block;width:13px;height:13px;border-radius:50%;
+       border:2px solid var(--line);margin-right:7px;vertical-align:-1px}
+  .mode.sel .dot{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 2px var(--field)}
+</style>
+</head>
+<body>
+<header>
+  <h1>ESP32 解锁器</h1>
+  <p>配置网页 · 仅在配置热点开启时可用</p>
+</header>
+
+<!-- 1. 登录 -->
+<section class="card" id="loginView">
+  <label for="loginPwd">网页登录密码</label>
+  <input id="loginPwd" type="password" inputmode="numeric" autocomplete="off"
+         maxlength="16" placeholder="输入网页登录密码">
+  <button id="loginBtn" type="button">登录</button>
+  <div class="msg err" id="loginMsg"></div>
+  <div class="hint">出厂默认密码 0000，第一次登录后必须修改。</div>
+</section>
+
+<!-- 2. 首次登录强制改密 -->
+<section class="card hidden" id="webpassView">
+  <span class="badge warn">首次使用</span>
+  <h2>请修改网页登录密码</h2>
+  <div class="hint">当前仍是出厂默认密码 0000，为了安全必须先改成你自己的密码，才能继续配置。</div>
+
+  <label class="gap" for="newWebPwd">新网页密码</label>
+  <input id="newWebPwd" type="password" inputmode="numeric" autocomplete="off"
+         maxlength="16" placeholder="4-16 位纯数字">
+  <label class="gap" for="newWebPwd2">再输入一次</label>
+  <input id="newWebPwd2" type="password" inputmode="numeric" autocomplete="off"
+         maxlength="16" placeholder="再次输入新密码">
+  <button id="webpassBtn" type="button">保存并继续</button>
+  <div class="msg" id="webpassMsg"></div>
+</section>
+
+<!-- 3. 配置 -->
+<section class="card hidden" id="configView">
+  <span class="badge" id="stateBadge">已登录</span>
+
+  <label class="gap">电脑解锁方式</label>
+  <div class="hint">电脑 PIN 和电脑密码可以都填，但同一时刻只能用其中一种解锁。</div>
+  <div class="modes">
+    <label class="mode" id="modePinCard">
+      <input type="radio" name="unlockMode" value="1" id="modePin">
+      <div class="t"><span class="dot"></span>用电脑 PIN</div>
+      <div class="s">4-16 位纯数字</div>
+    </label>
+    <label class="mode" id="modePwdCard">
+      <input type="radio" name="unlockMode" value="2" id="modePwd">
+      <div class="t"><span class="dot"></span>用电脑密码</div>
+      <div class="s">1-32 位英文 / 数字 / 符号</div>
+    </label>
+  </div>
+
+  <label class="gap" for="credPin">电脑 PIN</label>
+  <input id="credPin" type="text" inputmode="numeric" autocomplete="off"
+         maxlength="16" placeholder="4-16 位纯数字，不需要可留空">
+  <label class="gap" for="credPwd">电脑密码</label>
+  <input id="credPwd" type="text" autocomplete="off" autocapitalize="off"
+         spellcheck="false" maxlength="32" placeholder="1-32 位英文、数字或符号，不需要可留空">
+  <button id="credBtn" type="button">保存解锁设置</button>
+  <div class="msg" id="credMsg"></div>
+  <div class="hint">选「电脑密码」时，Windows 锁屏要先点「登录选项 → 密码」切到密码框，否则字母会被忽略；选「电脑 PIN」则保持在 PIN 输入框即可。键盘按美式布局发送，请勿在中文输入法状态下锁屏。</div>
+  <button id="credClearBtn" class="btn-ghost" type="button">清空电脑凭据</button>
+
+  <div class="divider"></div>
+  <label>键盘通路</label>
+  <div class="row"><span>USB 键盘</span><button id="usbBtn" class="toggle" type="button">—</button></div>
+  <div class="row"><span>蓝牙键盘</span><button id="bleBtn" class="toggle" type="button">—</button></div>
+  <div class="status" id="btStatus">—</div>
+  <button id="forgetBtn" class="btn-ghost" type="button">清除所有蓝牙配对</button>
+  <div class="msg" id="routeMsg"></div>
+  <div class="hint">关掉某条通路后，短按 BOOT 就只用另一条。换电脑时：先在 Windows「删除设备」，再点上面的清除配对，然后重新添加。</div>
+
+  <div class="divider"></div>
+  <label for="chgWebPwd">修改网页登录密码</label>
+  <input id="chgWebPwd" type="password" inputmode="numeric" autocomplete="off"
+         maxlength="16" placeholder="新的 4-16 位纯数字密码">
+  <button id="chgWebBtn" type="button">修改网页密码</button>
+  <div class="msg" id="chgWebMsg"></div>
+  <div class="hint">忘记网页密码时长按 BOOT 10 秒恢复出厂设置，全部凭据和配对都会清空。</div>
+</section>
+
+<footer>ESP32-S3 · USB HID 解锁器</footer>
+
+<script>
+(function () {
+  var loginView = document.getElementById('loginView');
+  var webpassView = document.getElementById('webpassView');
+  var configView = document.getElementById('configView');
+
+  var loginPwd = document.getElementById('loginPwd');
+  var loginBtn = document.getElementById('loginBtn');
+  var loginMsg = document.getElementById('loginMsg');
+
+  var newWebPwd = document.getElementById('newWebPwd');
+  var newWebPwd2 = document.getElementById('newWebPwd2');
+  var webpassBtn = document.getElementById('webpassBtn');
+  var webpassMsg = document.getElementById('webpassMsg');
+
+  var chgWebPwd = document.getElementById('chgWebPwd');
+  var chgWebBtn = document.getElementById('chgWebBtn');
+  var chgWebMsg = document.getElementById('chgWebMsg');
+
+  var stateBadge = document.getElementById('stateBadge');
+  var credPin = document.getElementById('credPin');
+  var credPwd = document.getElementById('credPwd');
+  var credBtn = document.getElementById('credBtn');
+  var credClearBtn = document.getElementById('credClearBtn');
+  var credMsg = document.getElementById('credMsg');
+  var modePin = document.getElementById('modePin');
+  var modePwd = document.getElementById('modePwd');
+  var modePinCard = document.getElementById('modePinCard');
+  var modePwdCard = document.getElementById('modePwdCard');
+
+  var usbBtn = document.getElementById('usbBtn');
+  var bleBtn = document.getElementById('bleBtn');
+  var btStatus = document.getElementById('btStatus');
+  var forgetBtn = document.getElementById('forgetBtn');
+  var routeMsg = document.getElementById('routeMsg');
+
+  var usbOn = true, bleOn = true;
+
+  /* ---------- 通用请求 ---------- */
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body || ''
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok || !data.ok) {
+          var e = new Error(data.error || '操作失败');
+          e.status = res.status;
+          e.data = data;
+          throw e;
+        }
+        return data;
+      });
+    });
+  }
+
+  function getJson(url) {
+    return fetch(url, {cache: 'no-store'}).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok || !data.ok) {
+          var e = new Error(data.error || '未登录');
+          e.status = res.status;
+          e.data = data;
+          throw e;
+        }
+        return data;
+      });
+    });
+  }
+
+  function setMsg(el, text, cls) {
+    el.textContent = text || '';
+    el.className = 'msg' + (cls ? ' ' + cls : '');
+  }
+
+  function show(view) {
+    loginView.classList.add('hidden');
+    webpassView.classList.add('hidden');
+    configView.classList.add('hidden');
+    view.classList.remove('hidden');
+  }
+
+  /* 请求失败的统一处理：401 回登录页，403 must_change 去改密页 */
+  function handleAuthErr(e) {
+    if (e.status === 403 && e.data && e.data.must_change) {
+      show(webpassView);
+      return true;
+    }
+    if (e.status === 401) {
+      show(loginView);
+      return true;
+    }
+    return false;
+  }
+
+  /* ---------- 配置页渲染 ---------- */
+
+  function renderRoute(d) {
+    usbOn = !!d.usb;
+    bleOn = !!d.ble;
+    usbBtn.textContent = usbOn ? '已开启' : '已关闭';
+    usbBtn.className = 'toggle' + (usbOn ? ' on' : '');
+    bleBtn.textContent = bleOn ? '已开启' : '已关闭';
+    bleBtn.className = 'toggle' + (bleOn ? ' on' : '');
+
+    var s;
+    if (!bleOn) { s = '蓝牙已关闭'; }
+    else if (d.ble_connected) { s = '蓝牙已连接电脑'; }
+    else if (d.ble_advertising) { s = '蓝牙广播中，等待配对或回连'; }
+    else { s = '蓝牙未广播'; }
+    btStatus.textContent = s + ' · 本机地址 ' + (d.ble_address || '未知');
+  }
+
+  function renderState(st) {
+    var txt;
+    if (st.mode === 1) { txt = '当前解锁方式：电脑 PIN'; }
+    else if (st.mode === 2) { txt = '当前解锁方式：电脑密码'; }
+    else { txt = '尚未设置解锁方式'; }
+    stateBadge.textContent = txt;
+    stateBadge.className = 'badge' + (st.mode ? '' : ' warn');
+  }
+
+  function setModeSel(mode) {
+    modePin.checked = (mode === '1');
+    modePwd.checked = (mode === '2');
+    modePinCard.className = 'mode' + (modePin.checked ? ' sel' : '');
+    modePwdCard.className = 'mode' + (modePwd.checked ? ' sel' : '');
+  }
+
+  function currentMode() {
+    if (modePin.checked) { return '1'; }
+    if (modePwd.checked) { return '2'; }
+    return '';
+  }
+
+  function loadConfig() {
+    return Promise.all([getJson('/api/status'), getJson('/api/cred')])
+      .then(function (r) {
+        var st = r[0], cred = r[1];
+        credPin.value = cred.pin || '';
+        credPwd.value = cred.password || '';
+        setModeSel(st.mode === 1 ? '1' : (st.mode === 2 ? '2' : ''));
+        renderState(st);
+        renderRoute(st);
+        show(configView);
+      })
+      .catch(function (e) {
+        if (!handleAuthErr(e)) { throw e; }
+      });
+  }
+
+  /* ---------- 登录 / 改网页密码 ---------- */
+
+  function login() {
+    var v = loginPwd.value.trim();
+    if (!v) { setMsg(loginMsg, '请输入密码', 'err'); return; }
+    loginBtn.disabled = true;
+    setMsg(loginMsg, '正在登录…');
+
+    post('/api/login', 'password=' + encodeURIComponent(v)).then(function (data) {
+      setMsg(loginMsg, '');
+      loginPwd.value = '';
+      if (data.must_change) {
+        show(webpassView);
+        newWebPwd.focus();
+      } else {
+        return loadConfig();
+      }
+    }).catch(function (e) {
+      setMsg(loginMsg, e.message || '密码不正确', 'err');
+    }).then(function () {
+      loginBtn.disabled = false;
+    });
+  }
+
+  function submitWebpass() {
+    var a = newWebPwd.value.trim();
+    var b = newWebPwd2.value.trim();
+    if (!/^\d{4,16}$/.test(a)) {
+      setMsg(webpassMsg, '网页密码必须是 4-16 位纯数字', 'err');
+      return;
+    }
+    if (a !== b) {
+      setMsg(webpassMsg, '两次输入的密码不一致', 'err');
+      return;
+    }
+    webpassBtn.disabled = true;
+    setMsg(webpassMsg, '正在保存…');
+
+    post('/api/webpass', 'password=' + encodeURIComponent(a)).then(function () {
+      setMsg(webpassMsg, '');
+      newWebPwd.value = '';
+      newWebPwd2.value = '';
+      return loadConfig();
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(webpassMsg, e.message || '保存失败', 'err');
+      }
+    }).then(function () {
+      webpassBtn.disabled = false;
+    });
+  }
+
+  function changeWebpass() {
+    var v = chgWebPwd.value.trim();
+    if (!/^\d{4,16}$/.test(v)) {
+      setMsg(chgWebMsg, '网页密码必须是 4-16 位纯数字', 'err');
+      return;
+    }
+    chgWebBtn.disabled = true;
+    setMsg(chgWebMsg, '正在保存…');
+
+    post('/api/webpass', 'password=' + encodeURIComponent(v)).then(function () {
+      chgWebPwd.value = '';
+      setMsg(chgWebMsg, '网页密码已修改', 'ok');
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(chgWebMsg, e.message || '保存失败', 'err');
+      }
+    }).then(function () {
+      chgWebBtn.disabled = false;
+    });
+  }
+
+  /* ---------- 保存电脑凭据 ---------- */
+
+  function saveCred() {
+    var pin = credPin.value.trim();
+    var pwd = credPwd.value;
+    var mode = currentMode();
+
+    if (pin && !/^\d{4,16}$/.test(pin)) {
+      setMsg(credMsg, '电脑 PIN 必须是 4-16 位纯数字', 'err');
+      return;
+    }
+    if (pwd && !/^[\x20-\x7E]{1,32}$/.test(pwd)) {
+      setMsg(credMsg, '电脑密码只能用 1-32 位英文、数字或符号（不支持中文）', 'err');
+      return;
+    }
+    if (!mode) {
+      setMsg(credMsg, '请选择用 PIN 还是用密码解锁', 'err');
+      return;
+    }
+    if (!pin && !pwd) {
+      setMsg(credMsg, '请至少填写电脑 PIN 或电脑密码中的一项', 'err');
+      return;
+    }
+    if (mode === '1' && !pin) {
+      setMsg(credMsg, '选择了 PIN 解锁，必须填写电脑 PIN', 'err');
+      return;
+    }
+    if (mode === '2' && !pwd) {
+      setMsg(credMsg, '选择了密码解锁，必须填写电脑密码', 'err');
+      return;
+    }
+
+    credBtn.disabled = true;
+    setMsg(credMsg, '正在保存…');
+
+    var body = 'pin=' + encodeURIComponent(pin) +
+               '&password=' + encodeURIComponent(pwd) +
+               '&mode=' + mode;
+
+    post('/api/cred', body).then(function () {
+      setMsg(credMsg, '已保存' + (mode === '1' ? '，短按 BOOT 将发送电脑 PIN' : '，短按 BOOT 将发送电脑密码'), 'ok');
+      return loadConfig();
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(credMsg, e.message || '保存失败', 'err');
+      }
+    }).then(function () {
+      credBtn.disabled = false;
+    });
+  }
+
+  function clearCred() {
+    if (!window.confirm('清空电脑 PIN、电脑密码和解锁方式？清空后短按 BOOT 不会发送任何按键。')) { return; }
+    credClearBtn.disabled = true;
+    setMsg(credMsg, '正在清空…');
+
+    post('/api/cred/clear').then(function () {
+      setMsg(credMsg, '已清空，短按 BOOT 将不发送按键', 'ok');
+      return loadConfig();
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(credMsg, e.message || '清空失败', 'err');
+      }
+    }).then(function () {
+      credClearBtn.disabled = false;
+    });
+  }
+
+  /* ---------- 通路 / 蓝牙 ---------- */
+  function saveRoute(usb, ble) {
+    usbBtn.disabled = true;
+    bleBtn.disabled = true;
+    setMsg(routeMsg, '正在保存…');
+
+    post('/api/route', 'usb=' + (usb ? 1 : 0) + '&ble=' + (ble ? 1 : 0)).then(function () {
+      setMsg(routeMsg, '已保存', 'ok');
+      return loadConfig();
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(routeMsg, e.message || '保存失败', 'err');
+      }
+    }).then(function () {
+      usbBtn.disabled = false;
+      bleBtn.disabled = false;
+    });
+  }
+
+  function forgetAll() {
+    if (!window.confirm('清除设备里保存的所有蓝牙配对？清除后电脑需要重新配对。')) { return; }
+    forgetBtn.disabled = true;
+    setMsg(routeMsg, '正在清除…');
+
+    post('/api/bt/forget').then(function () {
+      setMsg(routeMsg, '已清除，蓝牙重新开始广播；电脑端也要删除设备再重新添加', 'ok');
+      return loadConfig();
+    }).catch(function (e) {
+      if (!handleAuthErr(e)) {
+        setMsg(routeMsg, e.message || '清除失败', 'err');
+      }
+    }).then(function () {
+      forgetBtn.disabled = false;
+    });
+  }
+
+  /* ---------- 事件绑定 ---------- */
+
+  loginBtn.addEventListener('click', login);
+  webpassBtn.addEventListener('click', submitWebpass);
+  chgWebBtn.addEventListener('click', changeWebpass);
+  credBtn.addEventListener('click', saveCred);
+  credClearBtn.addEventListener('click', clearCred);
+  usbBtn.addEventListener('click', function () { saveRoute(!usbOn, bleOn); });
+  bleBtn.addEventListener('click', function () { saveRoute(usbOn, !bleOn); });
+  forgetBtn.addEventListener('click', forgetAll);
+
+  modePin.addEventListener('change', function () { setModeSel('1'); });
+  modePwd.addEventListener('change', function () { setModeSel('2'); });
+
+  loginPwd.addEventListener('keydown', function (e) { if (e.key === 'Enter') { login(); } });
+  newWebPwd2.addEventListener('keydown', function (e) { if (e.key === 'Enter') { submitWebpass(); } });
+  chgWebPwd.addEventListener('keydown', function (e) { if (e.key === 'Enter') { changeWebpass(); } });
+
+  /* 打开页面：已登录且已改密 → 配置页；未改密 → 改密页；未登录 → 登录页 */
+  loadConfig().catch(function (e) {
+    if (e.status === 403 && e.data && e.data.must_change) {
+      show(webpassView);
+    } else {
+      show(loginView);
+    }
+  });
+})();
+</script>
+</body>
+</html>

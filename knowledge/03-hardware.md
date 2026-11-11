@@ -23,7 +23,7 @@
 | OLED 屏母座 8P | 08 | 有，但按 SPI 用，见下 |
 | ATGM336H GPS | xiaozhi-esp32（`goouuu-s3-dual-gps` 变体） | 代码就绪，硬件未接线验证 |
 | 音量 +（GPIO17）/ 音量 −（GPIO39） | — | 未实现 |
-| BOOT 按键（GPIO0） | xiaozhi-esp32 | 单击对话、双击切网络模式、长按配网 |
+| BOOT 按键（GPIO0） | xiaozhi-esp32 / 15_usb_hid_unlock | xiaozhi：单击对话、双击切网络模式、长按配网；15：短按触发 USB HID 解锁，长按 3 秒开/关配置热点，长按 10 秒恢复出厂 |
 | 整机集成（屏幕 + 音频 + 传感器 + 网络） | xiaozhi-esp32 | 有，AI 随身助手应用 |
 | 外接电源开关 | — | 纯硬件，不需要程序 |
 
@@ -51,13 +51,15 @@
 
 三组引脚互不重叠，可以同时启用。
 
-## 上电前必须知道的三件事
+## 上电前必须知道的四件事
 
 第一，GPIO35、36、37 在 N16R8 模组上被 Octal PSRAM 占用，底板上虽然引到了排针，实际不可用。同理 GPIO26 到 32 归 Flash。外接电路前先对照 `docs/board.md` 的 GPIO 占用总表。
 
 第二，GPIO0、3、45、46 是 strapping 脚，上电瞬间的电平决定启动模式。GPIO0 已经接了 BOOT 按键，外接电路不要在上电时把它强拉低，否则芯片会进下载模式而不是运行程序。GPIO46 接了日志输出，外接负载会干扰启动。
 
 第三，GPIO43、44 是默认串口控制台，底板把这两个脚同时引给了 GPS 模块位。想用 GPS 就得先关掉控制台或改用 USB-CDC，否则两边抢同一组 UART。
+
+第四，ESP32-S3 的 USB-OTG 与 USB-Serial-JTAG 共用 GPIO19/20，同一时刻只能启用一个。15_usb_hid_unlock 用 OTG 做 HID 键盘，因此控制台必须留在 UART0，日志和烧录都要走核心板的 UART 口；改回 USB 控制台会导致 HID 无法枚举。
 
 ## 供电
 
