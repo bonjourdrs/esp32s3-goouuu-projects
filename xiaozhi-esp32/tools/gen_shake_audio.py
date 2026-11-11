@@ -2,9 +2,10 @@ import os
 import subprocess
 import sys
 
-FFMPEG = r"ffmpeg"
-OUT_DIR = r"D:\esp32\xiaozhi-esp32\main\assets\common"
-TMP_DIR = r"D:\esp32\xiaozhi-esp32\build\tts_tmp"
+FFMPEG = os.environ.get("FFMPEG_BIN") or "ffmpeg"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT_DIR = os.path.join(ROOT, "main", "assets", "common")
+TMP_DIR = os.path.join(ROOT, "build", "tts_tmp")
 VOICE = "zh-CN-XiaoxiaoNeural"
 
 LINES = {

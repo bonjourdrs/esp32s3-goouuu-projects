@@ -1,7 +1,8 @@
 $ErrorActionPreference = 'Stop'
-$ff = "ffmpeg"
-$outDir = "D:\esp32\xiaozhi-esp32\main\assets\common"
-$tmpDir = "D:\esp32\xiaozhi-esp32\build\tts_tmp"
+$ff = if ($env:FFMPEG_BIN) { $env:FFMPEG_BIN } else { 'ffmpeg' }
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$outDir = Join-Path $root 'main\assets\common'
+$tmpDir = Join-Path $root 'build\tts_tmp'
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
 $lines = @{
